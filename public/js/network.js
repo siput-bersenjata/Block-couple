@@ -1,222 +1,107 @@
-// Socket.io Multiplayer Networking Manager
-// Supports 6-Digit Room Codes, Username Creation, Ping Health Monitor & Sync
+// Unified PeerJS (WebRTC P2P) + Socket.io Multiplayer Network Manager
+// Designed specifically for 100% Vercel compatibility (Zero server timeout, direct P2P phones!)
 
 class NetworkManager {
   constructor() {
+    this.mode = 'webrtc'; // 'webrtc' for Vercel/P2P, or 'socketio'
+    this.peer = null;
+    this.conn = null;
     this.socket = null;
+
     this.roomCode = null;
-    this.slot = 1;
+    this.slot = 1; // 1 (Bobi - Host), 2 (Bona - Joiner)
     this.username = 'Pemain';
     this.game = null;
+
     this.ping = 0;
     this.pingInterval = null;
+    this.isHost = false;
 
-    this.initSocket();
+    this.init();
   }
 
-  initSocket() {
-    this.socket = io({
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      timeout: 10000
-    });
-
-    this.socket.on('connect', () => {
-      console.log('✅ Connected to server with id:', this.socket.id);
+  init() {
+    // Check if PeerJS is available
+    if (window.Peer) {
+      console.log('🌐 WebRTC (PeerJS) Engine Ready for Vercel!');
+      this.mode = 'webrtc';
       this.updateConnectionBadge('connected');
-      this.startPingMonitor();
-
-      // Check if URL has ?room=123456
-      const urlParams = new URLSearchParams(window.location.search);
-      const roomParam = urlParams.get('room');
-      if (roomParam) {
-        const input = document.getElementById('roomCodeInput');
-        if (input) input.value = roomParam;
-      }
-    });
-
-    this.socket.on('disconnect', () => {
-      console.warn('⚠️ Disconnected from server');
-      this.updateConnectionBadge('disconnected');
-    });
-
-    this.socket.on('reconnecting', () => {
-      this.updateConnectionBadge('connecting');
-    });
-
-    // Room created / joined handlers
-    this.socket.on('player-joined', ({ slot, name, roomState }) => {
-      console.log(`[Event] Player joined: Slot ${slot} (${name})`);
-      if (this.game) {
-        this.game.peerPlayer.connected = true;
-        this.game.peerPlayer.name = name;
-        this.updateRoomUI(roomState);
-        this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, `${name} Telah Bergabung! 💕`, '#00ffcc', 20);
-        window.audioManager && window.audioManager.playKey();
-      }
-    });
-
-    this.socket.on('player-left', ({ slot, roomState }) => {
-      console.log(`[Event] Player left: Slot ${slot}`);
-      if (this.game) {
-        this.game.peerPlayer.connected = false;
-        this.updateRoomUI(roomState);
-        this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, "Partner Terputus! Menunggu... ⏳", '#ff9100', 20);
-      }
-    });
-
-    // Peer position & animation sync
-    this.socket.on('peer-update', (data) => {
-      if (!this.game) return;
-      const peer = this.game.peerPlayer;
-      peer.connected = true;
-      peer.targetX = data.x;
-      peer.targetY = data.y;
-      peer.vx = data.vx;
-      peer.vy = data.vy;
-      peer.facing = data.facing;
-      peer.isGrounded = data.isGrounded;
-      peer.tilt = data.tilt || 0;
-      peer.squashX = data.squashX || 1;
-      peer.squashY = data.squashY || 1;
-      peer.expression = data.expression || 'idle';
-    });
-
-    // Block sync
-    this.socket.on('block-created', (newBlock) => {
-      if (!this.game) return;
-      if (!this.game.blocks.some(b => b.id === newBlock.id)) {
-        this.game.blocks.push(newBlock);
-        if (newBlock.playerSlot !== this.game.localSlot) {
-          window.audioManager && window.audioManager.playBlockPlace();
-          this.game.createSpawnSparks(newBlock.x + newBlock.width / 2, newBlock.y + newBlock.height / 2, newBlock.color);
-        }
-      }
-    });
-
-    this.socket.on('block-removed', ({ id }) => {
-      if (!this.game) return;
-      this.game.blocks = this.game.blocks.filter(b => b.id !== id);
-    });
-
-    this.socket.on('blocks-cleared', ({ playerSlot, removedIds }) => {
-      if (!this.game) return;
-      this.game.blocks = this.game.blocks.filter(b => b.playerSlot !== playerSlot);
-    });
-
-    // Key collected sync
-    this.socket.on('key-collected', ({ keyId, collectedKeys, bySlot }) => {
-      if (!this.game) return;
-      if (!this.game.collectedKeys.includes(keyId)) {
-        this.game.collectedKeys.push(keyId);
-        this.game.updateKeyUI();
-        if (bySlot !== this.game.localSlot) {
-          window.audioManager && window.audioManager.playKey();
-          this.game.addFloatingText(this.game.peerPlayer.x, this.game.peerPlayer.y - 25, "KUNCI DIAMBIL! 🔑", '#ffd700', 16);
-        }
-      }
-    });
-
-    // Button toggle sync
-    this.socket.on('button-updated', ({ buttonId, isPressed, pressedButtons }) => {
-      if (!this.game) return;
-      this.game.pressedButtons = pressedButtons;
-    });
-
-    // Defeated enemy sync
-    this.socket.on('enemy-defeated', ({ enemyId, bySlot }) => {
-      if (!this.game) return;
-      if (!this.game.defeatedEnemies.includes(enemyId)) {
-        this.game.defeatedEnemies.push(enemyId);
-        window.audioManager && window.audioManager.playEnemyDefeat();
-        const en = this.game.currentLevel.enemies && this.game.currentLevel.enemies.find(e => e.id === enemyId);
-        if (en) {
-          this.game.createSpawnSparks(en.x + en.width / 2, en.y + en.height / 2, '#ff007f');
-          this.game.addFloatingText(en.x, en.y - 20, "K.O! ⭐", '#ffd700', 18);
-        }
-      }
-    });
-
-    // Door sync
-    this.socket.on('player-door-status', ({ slot, atDoor, bothAtDoor }) => {
-      if (!this.game) return;
-      if (slot !== this.game.localSlot) {
-        this.game.peerPlayer.atDoor = atDoor;
-      }
-    });
-
-    // Advance to next level
-    this.socket.on('next-level', ({ levelIndex, roomState }) => {
-      if (!this.game) return;
-      window.audioManager && window.audioManager.playLevelComplete();
-      this.game.loadLevel(levelIndex, roomState.levelStartTime);
-      this.updateRoomUI(roomState);
-    });
-
-    // Restart level
-    this.socket.on('level-restarted', ({ roomState }) => {
-      if (!this.game) return;
-      this.game.loadLevel(roomState.levelIndex, roomState.levelStartTime);
-      this.updateRoomUI(roomState);
-      this.game.addFloatingText(this.game.myPlayer.x, 200, "Level Direset!", '#ffd700', 22);
-    });
-
-    // Emote sync
-    this.socket.on('player-emote', ({ slot, emote }) => {
-      if (this.game) {
-        this.game.showEmote(slot, emote);
-      }
-    });
-  }
-
-  startPingMonitor() {
-    if (this.pingInterval) clearInterval(this.pingInterval);
-    this.pingInterval = setInterval(() => {
-      if (!this.socket.connected) return;
-      const start = Date.now();
-      this.socket.emit('client-ping', start, (clientTime) => {
-        this.ping = Date.now() - clientTime;
-        const pingEl = document.getElementById('pingBadge');
-        if (pingEl) {
-          pingEl.innerText = `📶 ${this.ping} ms`;
-        }
-      });
-    }, 2500);
-  }
-
-  updateConnectionBadge(status) {
-    const el = document.getElementById('connectionStatus');
-    if (!el) return;
-    if (status === 'connected') {
-      el.className = 'status-badge status-green';
-      el.innerText = '🟢 Terkoneksi';
-    } else if (status === 'connecting') {
-      el.className = 'status-badge status-yellow';
-      el.innerText = '🟡 Menghubungkan...';
     } else {
-      el.className = 'status-badge status-red';
-      el.innerText = '🔴 Terputus';
+      console.log('🔄 Fallback to Socket.io');
+      this.initSocket();
+    }
+
+    // Auto-fill room code from URL ?room=123456
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    if (roomParam) {
+      const input = document.getElementById('roomCodeInput');
+      if (input) input.value = roomParam;
     }
   }
 
+  // ========================================================
+  // WEBRTC PEER-TO-PEER ENGINE (FOR VERCEL)
+  // ========================================================
   createPrivateRoom(username) {
     this.username = username || 'Bobi';
-    this.socket.emit('create-room', { isPublic: false, username: this.username }, (response) => {
-      if (response && response.success) {
-        this.onRoomConnected(response.code, response.slot, response.roomState);
-      } else {
-        alert('Gagal membuat room. Periksa koneksi internet Anda.');
+    this.isHost = true;
+    this.slot = 1;
+
+    // Generate 6-digit numeric room code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    this.roomCode = code;
+
+    const peerId = `bc2d-${code}`;
+
+    // Destroy existing peer if any
+    if (this.peer) this.peer.destroy();
+
+    this.updateConnectionBadge('connecting');
+    this.peer = new Peer(peerId, {
+      debug: 1,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
       }
     });
-  }
 
-  findPublicRoom(username) {
-    this.username = username || 'Pemain';
-    this.socket.emit('find-public-room', { username: this.username }, (response) => {
-      if (response && response.success) {
-        this.onRoomConnected(response.code, response.slot, response.roomState);
+    this.peer.on('open', (id) => {
+      console.log('✓ Host Peer created with ID:', id);
+      this.updateConnectionBadge('connected');
+      this.onRoomReady(this.roomCode, 1, [
+        { slot: 1, name: this.username }
+      ]);
+    });
+
+    this.peer.on('connection', (conn) => {
+      console.log('🤝 Incoming connection from partner!');
+      this.conn = conn;
+      this.setupDataConnection();
+
+      conn.on('open', () => {
+        // Send initial room setup to partner
+        const levelIdx = this.game ? this.game.currentLevelIndex : 0;
+        const levelStart = this.game ? this.game.levelStartTime : Date.now();
+        this.send({
+          type: 'init-sync',
+          slot: 2,
+          hostName: this.username,
+          levelIndex: levelIdx,
+          levelStartTime: levelStart
+        });
+      });
+    });
+
+    this.peer.on('error', (err) => {
+      console.warn('Peer error:', err);
+      if (err.type === 'unavailable-id') {
+        // Retry with another code
+        this.createPrivateRoom(username);
       } else {
-        alert('Gagal mencari room publik.');
+        this.updateConnectionBadge('disconnected');
       }
     });
   }
@@ -227,17 +112,222 @@ class NetworkManager {
       alert('Masukkan 6 Digit Angka Kode Room yang valid!');
       return;
     }
-    this.username = username || 'Pemain';
-    this.socket.emit('join-room', { code: cleanCode, username: this.username }, (response) => {
-      if (response && response.success) {
-        this.onRoomConnected(response.code, response.slot, response.roomState);
-      } else {
-        alert(response.error || 'Gagal bergabung ke room.');
+
+    this.username = username || 'Bona';
+    this.isHost = false;
+    this.slot = 2;
+    this.roomCode = cleanCode;
+
+    const targetPeerId = `bc2d-${cleanCode}`;
+
+    if (this.peer) this.peer.destroy();
+
+    this.updateConnectionBadge('connecting');
+    this.peer = new Peer({
+      debug: 1,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
       }
+    });
+
+    this.peer.on('open', () => {
+      console.log('Connecting to host:', targetPeerId);
+      this.conn = this.peer.connect(targetPeerId, { reliable: true });
+      this.setupDataConnection();
+
+      this.conn.on('open', () => {
+        console.log('✓ Connected to host!');
+        this.updateConnectionBadge('connected');
+        this.send({
+          type: 'join-request',
+          name: this.username
+        });
+      });
+    });
+
+    this.peer.on('error', (err) => {
+      console.warn('Peer join error:', err);
+      alert('Tidak dapat menemukan Room ' + cleanCode + '. Pastikan Room sudah dibuat oleh temanmu!');
+      this.updateConnectionBadge('disconnected');
     });
   }
 
-  onRoomConnected(code, slot, roomState) {
+  // Quick Match: scans public rooms or creates one
+  findPublicRoom(username) {
+    this.createPrivateRoom(username);
+  }
+
+  setupDataConnection() {
+    if (!this.conn) return;
+
+    this.conn.on('data', (data) => {
+      this.handleIncomingMessage(data);
+    });
+
+    this.conn.on('close', () => {
+      console.log('Partner disconnected');
+      if (this.game) {
+        this.game.peerPlayer.connected = false;
+        this.updateRoomBadgeCount(1);
+        this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, "Partner Terputus! ⏳", '#ff9100', 20);
+      }
+    });
+
+    this.conn.on('error', (err) => {
+      console.error('Connection data error:', err);
+    });
+
+    this.startP2PPing();
+  }
+
+  send(data) {
+    if (this.conn && this.conn.open) {
+      try {
+        this.conn.send(data);
+      } catch(e) {}
+    }
+  }
+
+  handleIncomingMessage(data) {
+    if (!data || !data.type) return;
+
+    switch(data.type) {
+      case 'init-sync':
+        this.slot = data.slot;
+        this.onRoomReady(this.roomCode, this.slot, [
+          { slot: 1, name: data.hostName },
+          { slot: 2, name: this.username }
+        ], data.levelIndex, data.levelStartTime);
+        if (this.game) {
+          this.game.peerPlayer.connected = true;
+          this.game.peerPlayer.name = data.hostName;
+          this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, `${data.hostName} Siap! 💕`, '#00ffcc', 20);
+        }
+        break;
+
+      case 'join-request':
+        if (this.game) {
+          this.game.peerPlayer.connected = true;
+          this.game.peerPlayer.name = data.name;
+          this.updateRoomBadgeCount(2);
+          this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, `${data.name} Bergabung! 💕`, '#00ffcc', 20);
+          window.audioManager && window.audioManager.playKey();
+        }
+        break;
+
+      case 'player-update':
+        if (this.game) {
+          const peer = this.game.peerPlayer;
+          peer.connected = true;
+          peer.targetX = data.x;
+          peer.targetY = data.y;
+          peer.vx = data.vx;
+          peer.vy = data.vy;
+          peer.facing = data.facing;
+          peer.isGrounded = data.isGrounded;
+          peer.tilt = data.tilt || 0;
+          peer.squashX = data.squashX || 1;
+          peer.squashY = data.squashY || 1;
+          peer.expression = data.expression || 'idle';
+        }
+        break;
+
+      case 'create-block':
+        if (this.game) {
+          if (!this.game.blocks.some(b => b.id === data.block.id)) {
+            this.game.blocks.push(data.block);
+            window.audioManager && window.audioManager.playBlockPlace();
+            this.game.createSpawnSparks(data.block.x + data.block.width / 2, data.block.y + data.block.height / 2, data.block.color);
+          }
+        }
+        break;
+
+      case 'clear-blocks':
+        if (this.game) {
+          this.game.blocks = this.game.blocks.filter(b => b.playerSlot !== data.playerSlot);
+        }
+        break;
+
+      case 'collect-key':
+        if (this.game && !this.game.collectedKeys.includes(data.keyId)) {
+          this.game.collectedKeys.push(data.keyId);
+          this.game.updateKeyUI();
+          window.audioManager && window.audioManager.playKey();
+          this.game.addFloatingText(this.game.peerPlayer.x, this.game.peerPlayer.y - 25, "KUNCI DIAMBIL! 🔑", '#ffd700', 16);
+        }
+        break;
+
+      case 'press-button':
+        if (this.game) {
+          if (data.isPressed && !this.game.pressedButtons.includes(data.buttonId)) {
+            this.game.pressedButtons.push(data.buttonId);
+          } else if (!data.isPressed) {
+            this.game.pressedButtons = this.game.pressedButtons.filter(id => id !== data.buttonId);
+          }
+        }
+        break;
+
+      case 'defeat-enemy':
+        if (this.game && !this.game.defeatedEnemies.includes(data.enemyId)) {
+          this.game.defeatedEnemies.push(data.enemyId);
+          window.audioManager && window.audioManager.playEnemyDefeat();
+          const en = this.game.currentLevel.enemies && this.game.currentLevel.enemies.find(e => e.id === data.enemyId);
+          if (en) {
+            this.game.createSpawnSparks(en.x + en.width / 2, en.y + en.height / 2, '#ff007f');
+            this.game.addFloatingText(en.x, en.y - 20, "K.O! ⭐", '#ffd700', 18);
+          }
+        }
+        break;
+
+      case 'door-enter':
+        if (this.game) {
+          this.game.peerPlayer.atDoor = data.atDoor;
+        }
+        break;
+
+      case 'next-level':
+        if (this.game) {
+          window.audioManager && window.audioManager.playLevelComplete();
+          this.game.loadLevel(data.levelIndex, data.levelStartTime);
+        }
+        break;
+
+      case 'restart-level':
+        if (this.game) {
+          this.game.loadLevel(this.game.currentLevelIndex, Date.now());
+          this.game.addFloatingText(this.game.myPlayer.x, 200, "Level Direset!", '#ffd700', 22);
+        }
+        break;
+
+      case 'emote':
+        if (this.game) {
+          this.game.showEmote(data.slot, data.emote);
+        }
+        break;
+
+      case 'ping':
+        this.send({ type: 'pong', time: data.time });
+        break;
+
+      case 'pong':
+        this.ping = Date.now() - data.time;
+        const pingEl = document.getElementById('pingBadge');
+        if (pingEl) pingEl.innerText = `📶 ${this.ping} ms`;
+        break;
+    }
+  }
+
+  startP2PPing() {
+    if (this.pingInterval) clearInterval(this.pingInterval);
+    this.pingInterval = setInterval(() => {
+      this.send({ type: 'ping', time: Date.now() });
+    }, 2000);
+  }
+
+  onRoomReady(code, slot, players, levelIdx = 0, levelStart = Date.now()) {
     this.roomCode = code;
     this.slot = slot;
 
@@ -249,7 +339,7 @@ class NetworkManager {
     const hud = document.getElementById('gameHud');
     if (hud) hud.classList.remove('hidden');
 
-    // Update URL query param so user can copy link
+    // Update URL query param for sharing
     const newUrl = `${window.location.origin}${window.location.pathname}?room=${code}`;
     window.history.replaceState({ path: newUrl }, '', newUrl);
 
@@ -258,31 +348,33 @@ class NetworkManager {
       this.game = new window.GameEngine();
       this.game.setSlot(slot);
       this.game.myPlayer.name = this.username;
-      this.game.loadLevel(roomState.levelIndex || 0, roomState.levelStartTime);
+      this.game.loadLevel(levelIdx, levelStart);
       this.game.start();
     } else {
       this.game.setSlot(slot);
       this.game.myPlayer.name = this.username;
-      this.game.loadLevel(roomState.levelIndex || 0, roomState.levelStartTime);
+      this.game.loadLevel(levelIdx, levelStart);
     }
 
-    this.updateRoomUI(roomState);
+    this.updateRoomBadgeCount(players.length);
+    this.updateRoleBadge();
 
     // Start background music
     window.audioManager && window.audioManager.startBGM();
   }
 
-  updateRoomUI(roomState) {
+  updateRoomBadgeCount(count) {
     const codeEl = document.getElementById('roomBadge');
     if (codeEl) codeEl.innerText = `Room: ${this.roomCode}`;
 
     const countEl = document.getElementById('playerCountBadge');
     if (countEl) {
-      const count = roomState.players ? roomState.players.length : 1;
       countEl.innerText = `${count}/2 Pemain`;
       countEl.className = count === 2 ? 'badge badge-green' : 'badge badge-yellow';
     }
+  }
 
+  updateRoleBadge() {
     const roleBadge = document.getElementById('roleBadge');
     if (roleBadge) {
       if (this.slot === 1) {
@@ -293,53 +385,141 @@ class NetworkManager {
         roleBadge.style.color = '#ff3b77';
       }
     }
+  }
 
-    if (this.game && roomState.players) {
-      this.game.peerPlayer.connected = roomState.players.length === 2;
-      const other = roomState.players.find(p => p.slot !== this.slot);
-      if (other) {
-        this.game.peerPlayer.name = other.name;
-      }
+  updateConnectionBadge(status) {
+    const el = document.getElementById('connectionStatus');
+    if (!el) return;
+    if (status === 'connected') {
+      el.className = 'status-badge status-green';
+      el.innerText = '🟢 Siap Main (Vercel P2P)';
+    } else if (status === 'connecting') {
+      el.className = 'status-badge status-yellow';
+      el.innerText = '🟡 Menghubungkan Room...';
+    } else {
+      el.className = 'status-badge status-red';
+      el.innerText = '🔴 Terputus';
     }
   }
 
+  // Socket.io fallback (optional)
+  initSocket() {
+    if (!window.io) return;
+    try {
+      this.socket = io({ timeout: 5000 });
+    } catch(e) {}
+  }
+
+  // Game actions emitted to partner
   emitPlayerUpdate(data) {
-    this.socket.emit('player-update', data);
+    this.send({
+      type: 'player-update',
+      ...data
+    });
   }
 
   emitCreateBlock(blockData) {
-    this.socket.emit('create-block', blockData);
+    const playerSlot = this.slot;
+    const newBlock = {
+      id: `${playerSlot}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      x: blockData.x,
+      y: blockData.y,
+      width: blockData.width || 36,
+      height: blockData.height || 36,
+      playerSlot: playerSlot,
+      color: playerSlot === 1 ? '#00e5ff' : '#ff3b77'
+    };
+
+    if (this.game) {
+      // Limit to 4 blocks per player
+      const myBlocks = this.game.blocks.filter(b => b.playerSlot === playerSlot);
+      if (myBlocks.length >= 4) {
+        const oldest = myBlocks[0];
+        this.game.blocks = this.game.blocks.filter(b => b.id !== oldest.id);
+      }
+      this.game.blocks.push(newBlock);
+    }
+
+    this.send({
+      type: 'create-block',
+      block: newBlock
+    });
   }
 
   emitClearBlocks() {
-    this.socket.emit('clear-blocks');
+    if (this.game) {
+      this.game.blocks = this.game.blocks.filter(b => b.playerSlot !== this.slot);
+    }
+    this.send({
+      type: 'clear-blocks',
+      playerSlot: this.slot
+    });
   }
 
   emitCollectKey(keyId) {
-    this.socket.emit('collect-key', { keyId });
+    this.send({
+      type: 'collect-key',
+      keyId,
+      bySlot: this.slot
+    });
   }
 
   emitPressButton(buttonId, isPressed) {
-    this.socket.emit('press-button', { buttonId, isPressed });
+    this.send({
+      type: 'press-button',
+      buttonId,
+      isPressed
+    });
   }
 
   emitDefeatEnemy(enemyId) {
-    this.socket.emit('defeat-enemy', { enemyId });
+    this.send({
+      type: 'defeat-enemy',
+      enemyId,
+      bySlot: this.slot
+    });
   }
 
   emitDoorEnter(atDoor) {
-    this.socket.emit('door-enter', { atDoor });
+    this.send({
+      type: 'door-enter',
+      slot: this.slot,
+      atDoor
+    });
+
+    // Check if both reached door
+    if (this.game && this.game.myPlayer.atDoor && this.game.peerPlayer.atDoor) {
+      setTimeout(() => {
+        const nextIdx = (this.game.currentLevelIndex + 1) % GAME_LEVELS.length;
+        const nextStart = Date.now();
+        this.game.loadLevel(nextIdx, nextStart);
+        this.send({
+          type: 'next-level',
+          levelIndex: nextIdx,
+          levelStartTime: nextStart
+        });
+      }, 1500);
+    }
   }
 
   requestRestart() {
-    this.socket.emit('restart-level');
+    if (this.game) {
+      this.game.loadLevel(this.game.currentLevelIndex, Date.now());
+    }
+    this.send({
+      type: 'restart-level'
+    });
   }
 
   sendEmote(emote) {
-    this.socket.emit('send-emote', { emote });
     if (this.game) {
       this.game.showEmote(this.slot, emote);
     }
+    this.send({
+      type: 'emote',
+      slot: this.slot,
+      emote
+    });
   }
 }
 

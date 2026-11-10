@@ -17,7 +17,12 @@ const PORT = process.env.PORT || 3000;
 // Serve static assets
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Health check endpoint for Render
+// Root & fallback route
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Health check endpoint
 app.get('/healthz', (req, res) => {
   res.status(200).send('OK');
 });
@@ -504,3 +509,5 @@ setInterval(() => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🎮 Block Couple Server running on http://0.0.0.0:${PORT}`);
 });
+
+module.exports = app;
