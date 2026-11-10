@@ -247,9 +247,15 @@ class GameEngine {
       const w = window.innerWidth;
       const h = window.innerHeight;
 
-      let scale = Math.min(w / CANVAS_WIDTH, (h - 90) / CANVAS_HEIGHT);
+      // In portrait on phones, reserve space for touch buttons at bottom
+      const isPortrait = w < h;
+      const reservedBottom = isPortrait ? 180 : 80;
+      const availableH = Math.max(160, h - reservedBottom);
+      const availableW = Math.max(280, w - 16);
+
+      let scale = Math.min(availableW / CANVAS_WIDTH, availableH / CANVAS_HEIGHT);
       if (scale > 1.25) scale = 1.25;
-      if (scale < 0.35) scale = 0.35;
+      if (scale < 0.28) scale = 0.28;
 
       this.canvas.style.width = `${Math.floor(CANVAS_WIDTH * scale)}px`;
       this.canvas.style.height = `${Math.floor(CANVAS_HEIGHT * scale)}px`;
@@ -258,6 +264,7 @@ class GameEngine {
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleResize);
     setTimeout(handleResize, 100);
+    setTimeout(handleResize, 500);
   }
 
   requestPlaceBlock() {
