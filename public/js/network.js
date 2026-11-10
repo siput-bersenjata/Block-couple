@@ -589,14 +589,28 @@ class NetworkManager {
           peer.connected = true;
           peer.targetX = data.x;
           peer.targetY = data.y;
+          peer.targetVx = data.vx;
+          peer.targetVy = data.vy;
           peer.vx = data.vx;
           peer.vy = data.vy;
           peer.facing = data.facing;
           peer.isGrounded = data.isGrounded;
-          peer.tilt = data.tilt || 0;
-          peer.squashX = data.squashX || 1;
-          peer.squashY = data.squashY || 1;
+          peer.targetTilt = data.tilt || 0;
+          peer.targetSquashX = data.squashX || 1;
+          peer.targetSquashY = data.squashY || 1;
           peer.expression = data.expression || 'idle';
+          peer.walkTime = data.walkTime || 0;
+
+          // If jump takeoff detected on partner, trigger jump dust
+          if (data.vy < -2.5 && (peer.lastVy === undefined || peer.lastVy >= -0.5)) {
+            this.game.createDust(data.x + 16, data.y + 32);
+          }
+          // If landing detected on partner, trigger landing dust
+          if (data.isGrounded && peer.lastGrounded === false && peer.lastVy > 1.5) {
+            this.game.createDust(data.x + 16, data.y + 32);
+          }
+          peer.lastVy = data.vy;
+          peer.lastGrounded = data.isGrounded;
         }
         break;
 

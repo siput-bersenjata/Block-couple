@@ -564,12 +564,26 @@ class GameEngine {
     const peer = this.peerPlayer;
     if (!peer.connected) return;
 
-    peer.x += (peer.targetX - peer.x) * 0.35;
-    peer.y += (peer.targetY - peer.y) * 0.35;
+    // Smooth movement interpolation
+    peer.x += (peer.targetX - peer.x) * 0.45;
+    peer.y += (peer.targetY - peer.y) * 0.45;
 
-    peer.squashX += (1 - peer.squashX) * 0.16;
-    peer.squashY += (1 - peer.squashY) * 0.16;
+    // Smooth tilt interpolation (so character never stays tilted sideways!)
+    const targetTilt = peer.targetTilt !== undefined ? peer.targetTilt : 0;
+    peer.tilt += (targetTilt - peer.tilt) * 0.25;
 
+    // Smooth squash/stretch interpolation
+    const targetSquashX = peer.targetSquashX !== undefined ? peer.targetSquashX : 1;
+    const targetSquashY = peer.targetSquashY !== undefined ? peer.targetSquashY : 1;
+    peer.squashX += (targetSquashX - peer.squashX) * 0.25;
+    peer.squashY += (targetSquashY - peer.squashY) * 0.25;
+
+    // Accumulate walk time for foot animations
+    if (Math.abs(peer.targetVx || peer.vx || 0) > 0.4 && peer.isGrounded) {
+      peer.walkTime = (peer.walkTime || 0) + dt;
+    }
+
+    // Blinking
     peer.blinkTimer--;
     if (peer.blinkTimer <= 0) {
       peer.isBlinking = !peer.isBlinking;
@@ -718,14 +732,7 @@ class GameEngine {
 
   resolveCollisionsY(p) {
     const solidBoxes = this.getAllSolidBoxes();
-    if (this.peerPlayer.connected) {
-      solidBoxes.push({
-        x: this.peerPlayer.x,
-        y: this.peerPlayer.y,
-        width: this.peerPlayer.width,
-        height: this.peerPlayer.height
-      });
-    }
+    // Note: Players do NOT collide solidly with each other, allowing smooth passthrough without glitching/kicking
 
     for (const b of solidBoxes) {
       if (this.checkOverlap(p, b)) {
@@ -733,7 +740,7 @@ class GameEngine {
           p.y = b.y - p.height;
           p.vy = 0;
           p.isGrounded = true;
-          if (p.vy > 3) {
+          if (p.vy > 2.5) {
             p.squashX = 1.25;
             p.squashY = 0.8;
             this.createDust(p.x + p.width / 2, p.y + p.height);
@@ -1497,9 +1504,24 @@ class GameEngine {
 
     ctx.translate(cx, cy);
 
-    // Apply movement tilt & squash
+    // Apply movement tilt & dynamic squash/stretch
     ctx.rotate(p.tilt || 0);
-    ctx.scale(p.squashX, p.squashY);
+
+    const isGrounded = p.isGrounded !== undefined ? p.isGrounded : true;
+    const vy = p.vy || p.targetVy || 0;
+    let baseSquashX = p.squashX || 1;
+    let baseSquashY = p.squashY || 1;
+
+    // Additional airborne stretch/squash for ultra-lively jump animations
+    if (!isGrounded && vy < -1.5) {
+      baseSquashX *= 0.92;
+      baseSquashY *= 1.12;
+    } else if (!isGrounded && vy > 1.8) {
+      baseSquashX *= 1.06;
+      baseSquashY *= 0.94;
+    }
+
+    ctx.scale(baseSquashX, baseSquashY);
 
     const w = p.width;
     const h = p.height;
@@ -1518,6 +1540,23 @@ class GameEngine {
     this.drawRoundedRect(ctx, -halfW + 3, -halfH + 3, w - 6, 6, 3);
     ctx.fill();
 
+    // Cute animated little feet (wobble when walking, tuck when jumping)
+    const isWalking = Math.abs(p.vx || (p.targetVx || 0)) > 0.3 && isGrounded;
+    const walkCycle = isWalking ? Math.sin((p.walkTime || 0) * 16) : 0;
+    const isAirborne = !isGrounded;
+
+    ctx.fillStyle = p.slot === 1 ? '#0077b6' : '#c2185b';
+    ctx.shadowBlur = 0;
+    if (isAirborne) {
+      // Tucked feet while jumping/falling
+      ctx.fillRect(-halfW + 5, halfH - 2, 7, 3);
+      ctx.fillRect(halfW - 12, halfH - 2, 7, 3);
+    } else {
+      // Natural walking/standing feet
+      ctx.fillRect(-halfW + 4, halfH - 3 + walkCycle * 2.5, 7, 4);
+      ctx.fillRect(halfW - 11, halfH - 3 - walkCycle * 2.5, 7, 4);
+    }
+
     // Rosy Cheeks
     ctx.fillStyle = p.slot === 1 ? 'rgba(0, 150, 255, 0.55)' : 'rgba(255, 60, 120, 0.65)';
     ctx.beginPath();
@@ -1526,8 +1565,8 @@ class GameEngine {
     ctx.fill();
 
     // Eyes with look-direction tracking
-    const eyeOffsetX = p.facing * 3;
-    const eyeOffsetY = Math.max(-2, Math.min(2, p.vy * 0.2));
+    const eyeOffsetX = (p.facing || 1) * 3;
+    const eyeOffsetY = Math.max(-2, Math.min(2, vy * 0.2));
 
     if (p.isBlinking) {
       ctx.strokeStyle = '#0f172a';
@@ -1561,16 +1600,17 @@ class GameEngine {
       ctx.fill();
     }
 
-    // Mouth Expression
+    // Mouth Expression (Excited open mouth on jump, wavy on fall, smile on idle/walk)
     ctx.strokeStyle = '#0f172a';
     ctx.lineWidth = 1.8;
     ctx.beginPath();
-    if (p.expression === 'jump') {
-      // Cute open 'o'
+    if (p.expression === 'jump' || (!isGrounded && vy < 0)) {
+      // Cute excited open 'o' mouth
       ctx.fillStyle = '#ff6b81';
-      ctx.arc(0, 3, 2.5, 0, Math.PI * 2);
+      ctx.arc(0, 3, 2.8, 0, Math.PI * 2);
       ctx.fill();
-    } else if (p.expression === 'fall') {
+      ctx.stroke();
+    } else if (p.expression === 'fall' || (!isGrounded && vy > 1.2)) {
       // Small wavy worried mouth
       ctx.moveTo(-3, 3);
       ctx.lineTo(3, 4);
