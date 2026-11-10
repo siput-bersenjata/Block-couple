@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Block Couple: Duo Quest - 2D Co-op Platformer</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Google Fonts for arcade / modern game feel -->
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
@@ -15,17 +15,19 @@
     <!-- TOP NAVIGATION HUD -->
     <header id="gameHud" class="hud-bar hidden">
       <div class="hud-left">
-        <span id="roomBadge" class="badge badge-purple">Room: ----</span>
+        <span id="roomBadge" class="badge badge-purple">Room: ------</span>
         <span id="playerCountBadge" class="badge badge-yellow">1/2 Pemain</span>
+        <span id="pingBadge" class="badge badge-gray">📶 -- ms</span>
         <span id="roleBadge" class="role-indicator">Kamu: Bobi</span>
       </div>
 
       <div class="hud-center">
-        <div id="levelTitle" class="level-title">Level 1: Jembatan Berlubang</div>
-        <div id="keyTracker" class="key-tracker">🔑 0/1 Kunci</div>
+        <div id="levelTitle" class="level-title">Level 1: Gerbang Awal & Monster Lendir</div>
+        <div id="keyTracker" class="key-tracker">🔑 0/2 Kunci</div>
       </div>
 
       <div class="hud-right">
+        <button id="btnFullscreen" class="hud-btn" title="Layar Penuh HP">⛶ Layar Penuh</button>
         <button id="btnCopyLink" class="hud-btn" title="Salin Link Main Bareng">🔗 Bagikan</button>
         <button id="btnRestart" class="hud-btn" title="Reset Level">🔄 Ulang</button>
         <button id="btnMute" class="hud-btn" title="Mute Suara">🔊</button>
@@ -34,10 +36,10 @@
 
     <!-- HINT BANNER -->
     <div id="levelHint" class="hint-banner">
-      Gunakan tombol [📦 Buat Balok] untuk menutupi jalan berlubang!
+      Gunakan tombol [📦 Buat Balok] untuk jembatan jurang, dan injak / kurung monster lendir!
     </div>
 
-    <!-- MAIN GAME CANVAS WRAPPER -->
+    <!-- MAIN 2.5D GAME CANVAS WRAPPER -->
     <main id="gameContainer">
       <canvas id="gameCanvas" width="960" height="540"></canvas>
     </main>
@@ -78,7 +80,7 @@
     </div>
   </div>
 
-  <!-- LOBBY / ROOM SELECTION MODAL -->
+  <!-- LOBBY / LOGIN & ROOM SELECTION MODAL -->
   <div id="lobbyModal" class="modal-overlay">
     <div class="modal-card">
       <div class="logo-area">
@@ -96,7 +98,18 @@
           </div>
         </div>
         <h1 class="game-title">BLOCK COUPLE</h1>
-        <p class="game-tagline">Petualangan Puzzle Co-op 2 Pemain</p>
+        <p class="game-tagline">Petualangan 2.5D Co-op 2 Pemain</p>
+        <div class="connection-status-row">
+          <span id="connectionStatus" class="status-badge status-yellow">🟡 Menghubungkan ke Server...</span>
+        </div>
+      </div>
+
+      <!-- USERNAME CREATION SECTION -->
+      <div class="username-section">
+        <label for="usernameInput" class="input-label">👤 Nama Karakter Kamu:</label>
+        <div class="username-input-wrapper">
+          <input type="text" id="usernameInput" placeholder="Masukkan nama kamu..." maxlength="15" autocomplete="off" spellcheck="false">
+        </div>
       </div>
 
       <div class="lobby-actions">
@@ -106,28 +119,28 @@
           <span>Cari Lawan / Room Publik</span>
         </button>
 
-        <div class="divider"><span>ATAU MAIN DENGAN TEMAN</span></div>
+        <div class="divider"><span>ATAU MAIN DENGAN TEMAN (KODE 6 ANGKA)</span></div>
 
-        <!-- Create Private Room -->
+        <!-- Create Private Room with 6 Digits -->
         <button id="btnCreatePrivate" class="btn-secondary">
           <span class="btn-icon">➕</span>
-          <span>Buat Room Privat (Kode Baru)</span>
+          <span>Buat Room Baru (Kode 6 Angka)</span>
         </button>
 
-        <!-- Join with Code -->
+        <!-- Join with 6-Digit Code -->
         <div class="join-code-group">
-          <input type="text" id="roomCodeInput" maxlength="5" placeholder="KODE ROOM" autocomplete="off" autocorrect="off" autocapitalize="characters">
-          <button id="btnJoinCode" class="btn-join">Gabung</button>
+          <input type="text" id="roomCodeInput" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="KODE 6 ANGKA" autocomplete="off">
+          <button id="btnJoinCode" class="btn-join">Masuk</button>
         </div>
       </div>
 
       <div class="instructions-box">
-        <h3>📖 Cara Bermain (HP & Komputer):</h3>
+        <h3>📖 Panduan Bermain (Ponsel & Komputer):</h3>
         <ul>
-          <li>👫 <b>Bobi & Bona:</b> Bekerjasama untuk melewati rintangan!</li>
-          <li>📦 <b>Buat Balok:</b> Pasang balok untuk jembatan jalan berlubang & anak tangga.</li>
-          <li>🔑 <b>Kunci & Pintu:</b> Ambil semua kunci, lalu <b>kedua pemain</b> harus bersama-sama masuk ke pintu!</li>
-          <li>🎮 <b>Kontrol PC:</b> Tombol <b>A/D/Panah</b> (Gerak), <b>W/Spasi</b> (Lompat), <b>E/X</b> (Balok), <b>C</b> (Hapus).</li>
+          <li>👫 <b>Bobi & Bona:</b> Bekerjasama melewati jurang, anak tangga tebing, & musuh!</li>
+          <li>📦 <b>Balok Ajaib:</b> Taruh balok untuk jembatan jurang, anak tangga tinggi, atau menimpa musuh.</li>
+          <li>👾 <b>Musuh & Rintangan:</b> Injak/timpa monster lendir, hindari drone terbang, dan gunakan pegas trampolin!</li>
+          <li>🔑 <b>Kunci & Pintu:</b> Ambil semua kunci emas, lalu <b>kedua pemain</b> harus bersama-sama masuk ke pintu!</li>
         </ul>
       </div>
     </div>
@@ -144,34 +157,59 @@
   <script src="js/game.js"></script>
   <script src="js/network.js"></script>
 
-  <!-- Main UI Event Bindings -->
+  <!-- UI Event Bindings & LocalStorage -->
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      const usernameInput = document.getElementById('usernameInput');
+      const savedName = localStorage.getItem('blockCoupleUsername');
+      if (savedName) {
+        usernameInput.value = savedName;
+      } else {
+        usernameInput.value = 'Pemain ' + Math.floor(10 + Math.random() * 89);
+      }
+
+      function getUsername() {
+        let name = usernameInput.value.trim();
+        if (!name) name = 'Pemain';
+        localStorage.setItem('blockCoupleUsername', name);
+        return name;
+      }
+
       // Lobby button handlers
       document.getElementById('btnQuickMatch').addEventListener('click', () => {
         window.audioManager.init();
-        window.networkManager.findPublicRoom();
+        window.networkManager.findPublicRoom(getUsername());
       });
 
       document.getElementById('btnCreatePrivate').addEventListener('click', () => {
         window.audioManager.init();
-        window.networkManager.createPrivateRoom();
+        window.networkManager.createPrivateRoom(getUsername());
       });
 
       document.getElementById('btnJoinCode').addEventListener('click', () => {
         window.audioManager.init();
         const code = document.getElementById('roomCodeInput').value.trim();
-        window.networkManager.joinRoom(code);
+        window.networkManager.joinRoom(code, getUsername());
       });
 
       // HUD button handlers
       document.getElementById('btnCopyLink').addEventListener('click', () => {
         const url = window.location.href;
         navigator.clipboard.writeText(url).then(() => {
-          showToast('Link room berhasil disalin! Kirimkan ke temanmu.');
+          showToast('Link room 6 angka berhasil disalin! Kirimkan ke WhatsApp teman.');
         }).catch(() => {
           prompt('Salin link ini untuk temanmu:', url);
         });
+      });
+
+      document.getElementById('btnFullscreen').addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => {
+            console.log(err);
+          });
+        } else {
+          document.exitFullscreen().catch(err => console.log(err));
+        }
       });
 
       document.getElementById('btnRestart').addEventListener('click', () => {

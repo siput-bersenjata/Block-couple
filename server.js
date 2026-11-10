@@ -23,16 +23,12 @@ app.get('/healthz', (req, res) => {
 });
 
 // Room state storage
-// roomCode -> { code, isPublic, players: { socketId: { id, slot, x, y, vx, vy, facing, isGrounded, blocksLeft } }, levelIndex, keysCollected: Set, blocks: [], buttonsPressed: Set, lastActivity: timestamp }
+// roomCode (6 digits) -> room object
 const rooms = new Map();
 
+// Generate 6-digit numeric room code (e.g. 100000 - 999999)
 function generateRoomCode() {
-  const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let result = '';
-  for (let i = 0; i < 4; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
-  return result;
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 function getAvailablePublicRoom() {
@@ -48,20 +44,33 @@ io.on('connection', (socket) => {
   console.log(`[Socket] User connected: ${socket.id}`);
   let currentRoomCode = null;
 
-  // Create private room
-  socket.on('create-room', ({ isPublic = false } = {}, callback) => {
+  // Ping check for latency/connection health monitor
+  socket.on('client-ping', (clientTime, callback) => {
+    if (typeof callback === 'function') {
+      callback(clientTime, Date.now());
+    }
+  });
+
+  // Create private room (6 digits)
+  socket.on('create-room', ({ isPublic = false, username = '' } = {}, callback) => {
     let code;
+    let attempts = 0;
     do {
       code = generateRoomCode();
-    } while (rooms.has(code));
+      attempts++;
+    } while (rooms.has(code) && attempts < 100);
+
+    const displayName = (username || '').trim().substring(0, 15) || 'Bobi (Biru)';
 
     const room = {
       code,
       isPublic: Boolean(isPublic),
       players: {},
       levelIndex: 0,
+      levelStartTime: Date.now(),
       collectedKeys: [],
       pressedButtons: [],
+      defeatedEnemies: [],
       blocks: [], // { id, x, y, width, height, playerSlot, color }
       createdAt: Date.now(),
       completed: false
@@ -71,9 +80,9 @@ io.on('connection', (socket) => {
     room.players[socket.id] = {
       socketId: socket.id,
       slot: 1,
-      name: 'Bobi (Biru)',
-      color: '#00d2ff',
-      x: 60,
+      name: displayName,
+      color: '#00e5ff',
+      x: 80,
       y: 400,
       vx: 0,
       vy: 0,
@@ -85,7 +94,7 @@ io.on('connection', (socket) => {
     currentRoomCode = code;
     socket.join(code);
 
-    console.log(`[Room ${code}] Created (Public: ${room.isPublic}) by player ${socket.id}`);
+    console.log(`[Room ${code}] Created (Public: ${room.isPublic}) by ${displayName} (${socket.id})`);
     if (typeof callback === 'function') {
       callback({
         success: true,
@@ -96,14 +105,14 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Join existing room
-  socket.on('join-room', ({ code }, callback) => {
-    const upperCode = (code || '').trim().toUpperCase();
-    const room = rooms.get(upperCode);
+  // Join existing room with 6-digit code
+  socket.on('join-room', ({ code, username = '' }, callback) => {
+    const cleanCode = (code || '').toString().trim();
+    const room = rooms.get(cleanCode);
 
     if (!room) {
       if (typeof callback === 'function') {
-        callback({ success: false, error: 'Room tidak ditemukan! Periksa kembali kodenya.' });
+        callback({ success: false, error: 'Room dengan kode ' + cleanCode + ' tidak ditemukan! Pastikan 6 digit angka sudah benar.' });
       }
       return;
     }
@@ -119,13 +128,15 @@ io.on('connection', (socket) => {
     // Determine slot (1 or 2)
     const existingSlot = room.players[playerKeys[0]] ? room.players[playerKeys[0]].slot : 1;
     const assignedSlot = existingSlot === 1 ? 2 : 1;
+    const defaultName = assignedSlot === 1 ? 'Bobi (Biru)' : 'Bona (Pink)';
+    const displayName = (username || '').trim().substring(0, 15) || defaultName;
 
     room.players[socket.id] = {
       socketId: socket.id,
       slot: assignedSlot,
-      name: assignedSlot === 1 ? 'Bobi (Biru)' : 'Bona (Pink)',
-      color: assignedSlot === 1 ? '#00d2ff' : '#ff4d88',
-      x: assignedSlot === 1 ? 60 : 100,
+      name: displayName,
+      color: assignedSlot === 1 ? '#00e5ff' : '#ff3b77',
+      x: assignedSlot === 1 ? 80 : 130,
       y: 400,
       vx: 0,
       vy: 0,
@@ -133,10 +144,10 @@ io.on('connection', (socket) => {
       isGrounded: false
     };
 
-    currentRoomCode = upperCode;
-    socket.join(upperCode);
+    currentRoomCode = cleanCode;
+    socket.join(cleanCode);
 
-    console.log(`[Room ${upperCode}] Player joined: ${socket.id} as Slot ${assignedSlot}`);
+    console.log(`[Room ${cleanCode}] Player ${displayName} joined as Slot ${assignedSlot}`);
 
     const roomState = getPublicRoomState(room);
 
@@ -144,32 +155,35 @@ io.on('connection', (socket) => {
     if (typeof callback === 'function') {
       callback({
         success: true,
-        code: upperCode,
+        code: cleanCode,
         slot: assignedSlot,
         roomState
       });
     }
 
     // Broadcast to room that a player joined
-    io.to(upperCode).emit('player-joined', {
+    io.to(cleanCode).emit('player-joined', {
       slot: assignedSlot,
+      name: displayName,
       roomState
     });
   });
 
   // Quick Match / Public Room
-  socket.on('find-public-room', (callback) => {
+  socket.on('find-public-room', ({ username = '' } = {}, callback) => {
     let targetCode = getAvailablePublicRoom();
     if (targetCode) {
-      // Join existing
+      // Join existing public room
       const room = rooms.get(targetCode);
       const assignedSlot = 2;
+      const displayName = (username || '').trim().substring(0, 15) || 'Bona (Pink)';
+
       room.players[socket.id] = {
         socketId: socket.id,
         slot: assignedSlot,
-        name: 'Bona (Pink)',
-        color: '#ff4d88',
-        x: 100,
+        name: displayName,
+        color: '#ff3b77',
+        x: 130,
         y: 400,
         vx: 0,
         vy: 0,
@@ -183,21 +197,25 @@ io.on('connection', (socket) => {
       if (typeof callback === 'function') {
         callback({ success: true, code: targetCode, slot: assignedSlot, roomState });
       }
-      io.to(targetCode).emit('player-joined', { slot: assignedSlot, roomState });
+      io.to(targetCode).emit('player-joined', { slot: assignedSlot, name: displayName, roomState });
     } else {
-      // Create new public room
+      // Create new public room (6 digits)
       let code;
       do {
         code = generateRoomCode();
       } while (rooms.has(code));
+
+      const displayName = (username || '').trim().substring(0, 15) || 'Bobi (Biru)';
 
       const room = {
         code,
         isPublic: true,
         players: {},
         levelIndex: 0,
+        levelStartTime: Date.now(),
         collectedKeys: [],
         pressedButtons: [],
+        defeatedEnemies: [],
         blocks: [],
         createdAt: Date.now(),
         completed: false
@@ -206,9 +224,9 @@ io.on('connection', (socket) => {
       room.players[socket.id] = {
         socketId: socket.id,
         slot: 1,
-        name: 'Bobi (Biru)',
-        color: '#00d2ff',
-        x: 60,
+        name: displayName,
+        color: '#00e5ff',
+        x: 80,
         y: 400,
         vx: 0,
         vy: 0,
@@ -226,7 +244,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Player position and motion sync
+  // Player position, motion, and animation sync
   socket.on('player-update', (data) => {
     if (!currentRoomCode) return;
     const room = rooms.get(currentRoomCode);
@@ -240,6 +258,10 @@ io.on('connection', (socket) => {
     p.facing = data.facing;
     p.isGrounded = data.isGrounded;
     p.anim = data.anim;
+    p.tilt = data.tilt;
+    p.squashX = data.squashX;
+    p.squashY = data.squashY;
+    p.expression = data.expression;
 
     // Relay to other player in room
     socket.to(currentRoomCode).emit('peer-update', {
@@ -250,7 +272,11 @@ io.on('connection', (socket) => {
       vy: p.vy,
       facing: p.facing,
       isGrounded: p.isGrounded,
-      anim: p.anim
+      anim: p.anim,
+      tilt: p.tilt,
+      squashX: p.squashX,
+      squashY: p.squashY,
+      expression: p.expression
     });
   });
 
@@ -262,10 +288,9 @@ io.on('connection', (socket) => {
 
     const player = room.players[socket.id];
 
-    // Limit active blocks per player to 4 to prevent clutter and keep puzzle challenge
+    // Limit active blocks per player to 4 to prevent puzzle cheating
     const playerBlocks = room.blocks.filter(b => b.playerSlot === player.slot);
     if (playerBlocks.length >= 4) {
-      // Remove the oldest block placed by this player
       const oldest = playerBlocks[0];
       room.blocks = room.blocks.filter(b => b.id !== oldest.id);
       io.to(currentRoomCode).emit('block-removed', { id: oldest.id });
@@ -334,6 +359,21 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Defeat enemy (e.g. crushed by placed block or stomped)
+  socket.on('defeat-enemy', ({ enemyId }) => {
+    if (!currentRoomCode) return;
+    const room = rooms.get(currentRoomCode);
+    if (!room) return;
+
+    if (!room.defeatedEnemies.includes(enemyId)) {
+      room.defeatedEnemies.push(enemyId);
+      io.to(currentRoomCode).emit('enemy-defeated', {
+        enemyId,
+        bySlot: room.players[socket.id] ? room.players[socket.id].slot : 1
+      });
+    }
+  });
+
   // Player reached exit door
   socket.on('door-enter', ({ atDoor }) => {
     if (!currentRoomCode) return;
@@ -353,11 +393,13 @@ io.on('connection', (socket) => {
 
     if (bothAtDoor && !room.completed) {
       room.completed = true;
-      // Advance to next level after brief celebration
+      // Advance to next level after celebration
       setTimeout(() => {
         room.levelIndex++;
+        room.levelStartTime = Date.now();
         room.collectedKeys = [];
         room.pressedButtons = [];
+        room.defeatedEnemies = [];
         room.blocks = [];
         room.completed = false;
         for (const p of Object.values(room.players)) {
@@ -380,6 +422,7 @@ io.on('connection', (socket) => {
 
     room.collectedKeys = [];
     room.pressedButtons = [];
+    room.defeatedEnemies = [];
     room.blocks = [];
     room.completed = false;
     for (const p of Object.values(room.players)) {
@@ -440,8 +483,10 @@ function getPublicRoomState(room) {
       atDoor: p.atDoor || false
     })),
     levelIndex: room.levelIndex,
+    levelStartTime: room.levelStartTime,
     collectedKeys: room.collectedKeys,
     pressedButtons: room.pressedButtons,
+    defeatedEnemies: room.defeatedEnemies || [],
     blocks: room.blocks
   };
 }

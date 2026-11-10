@@ -46,3 +46,4 @@ Game 2D Co-op Platformer Multiplayer realtime untuk 2 orang pemain, dioptimalkan
    - **Instance Type:** `Free`
 4. Klik **Deploy Web Service**!
 5. Setelah status menjadi `Live`, buka URL Render (misal `https://block-couple.onrender.com`) langsung dari ponsel dan nikmati permainannya bersama teman Anda!
+

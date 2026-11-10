@@ -1,5 +1,5 @@
-// Block Couple - Main Game Engine & Renderer
-// Supports Mobile Touch Screens & Desktop Keyboards
+// Block Couple - Main 2.5D Game Engine & Enhanced Renderer
+// Smooth Parallax Camera, 3D Depth, Expressive Cube Animations, Enemies & Moving Platforms
 
 const CANVAS_WIDTH = 960;
 const CANVAS_HEIGHT = 540;
@@ -11,6 +11,17 @@ class GameEngine {
 
     this.currentLevelIndex = 0;
     this.currentLevel = GAME_LEVELS[0];
+    this.levelStartTime = Date.now();
+
+    // Camera 2.5D System
+    this.camera = {
+      x: 0,
+      y: 0,
+      targetX: 0,
+      targetY: 0,
+      tilt: 0,
+      scale: 1
+    };
 
     // Local player identity
     this.localSlot = 1; // 1 (Bobi) or 2 (Bona)
@@ -21,12 +32,16 @@ class GameEngine {
     this.blocks = [];
     this.collectedKeys = [];
     this.pressedButtons = [];
+    this.defeatedEnemies = [];
 
     // Particles and visual FX
     this.particles = [];
     this.floatingTexts = [];
-    this.emotes = []; // { slot, text, x, y, life }
+    this.emotes = [];
     this.screenShake = 0;
+
+    // Moving platform states
+    this.movingPlatformDeltas = {};
 
     // Input state
     this.keysDown = {};
@@ -69,9 +84,13 @@ class GameEngine {
       jumpBuffer: 0,
       squashX: 1,
       squashY: 1,
+      tilt: 0,
+      walkTime: 0,
       blinkTimer: Math.random() * 100 + 60,
       isBlinking: false,
-      atDoor: false
+      atDoor: false,
+      expression: 'idle',
+      hurtTimer: 0
     };
 
     this.peerPlayer = {
@@ -90,38 +109,46 @@ class GameEngine {
       targetY: 400,
       squashX: 1,
       squashY: 1,
+      tilt: 0,
+      walkTime: 0,
       blinkTimer: 100,
       isBlinking: false,
       atDoor: false,
-      connected: false
+      connected: false,
+      expression: 'idle',
+      hurtTimer: 0
     };
   }
 
   setSlot(slot) {
     this.localSlot = slot;
     this.myPlayer.slot = slot;
-    this.myPlayer.name = slot === 1 ? 'Bobi' : 'Bona';
     this.myPlayer.color = slot === 1 ? '#00e5ff' : '#ff3b77';
 
     this.peerPlayer.slot = slot === 1 ? 2 : 1;
-    this.peerPlayer.name = slot === 1 ? 'Bona' : 'Bobi';
     this.peerPlayer.color = slot === 1 ? '#ff3b77' : '#00e5ff';
 
     this.respawnPlayers();
   }
 
-  loadLevel(index) {
+  loadLevel(index, startTime) {
     this.currentLevelIndex = index % GAME_LEVELS.length;
     this.currentLevel = GAME_LEVELS[this.currentLevelIndex];
+    this.levelStartTime = startTime || Date.now();
     this.collectedKeys = [];
     this.pressedButtons = [];
+    this.defeatedEnemies = [];
     this.blocks = [];
     this.respawnPlayers();
 
+    // Reset camera position to start zone
+    this.camera.x = 0;
+    this.camera.targetX = 0;
+
     // Visual notification
-    this.addFloatingText(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 40, this.currentLevel.title, '#ffffff', 32);
-    
-    // Update UI
+    this.addFloatingText(this.myPlayer.x + 100, 200, this.currentLevel.title, '#ffffff', 28);
+
+    // Update HUD
     const titleEl = document.getElementById('levelTitle');
     if (titleEl) titleEl.innerText = this.currentLevel.title;
     const hintEl = document.getElementById('levelHint');
@@ -145,6 +172,7 @@ class GameEngine {
     this.myPlayer.vx = 0;
     this.myPlayer.vy = 0;
     this.myPlayer.atDoor = false;
+    this.myPlayer.hurtTimer = 0;
     this.peerPlayer.vx = 0;
     this.peerPlayer.vy = 0;
     this.peerPlayer.atDoor = false;
@@ -153,9 +181,7 @@ class GameEngine {
   }
 
   setupInputs() {
-    // Keyboard inputs
     window.addEventListener('keydown', (e) => {
-      // Prevent browser scroll on arrow / space
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
         e.preventDefault();
       }
@@ -178,7 +204,7 @@ class GameEngine {
       this.keysDown[e.key.toLowerCase()] = false;
     });
 
-    // Touch button inputs for mobile
+    // Touch controls
     const bindTouchBtn = (elementId, startHandler, endHandler) => {
       const el = document.getElementById(elementId);
       if (!el) return;
@@ -221,7 +247,6 @@ class GameEngine {
       const w = window.innerWidth;
       const h = window.innerHeight;
 
-      // Keep 16:9 ratio
       let scale = Math.min(w / CANVAS_WIDTH, (h - 90) / CANVAS_HEIGHT);
       if (scale > 1.25) scale = 1.25;
       if (scale < 0.35) scale = 0.35;
@@ -236,9 +261,6 @@ class GameEngine {
   }
 
   requestPlaceBlock() {
-    // Placement logic:
-    // If aiming down or airborne downwards: place directly below player (stepping stone / stair)
-    // Else: place in front of player
     const isAimingDown = this.keysDown['s'] || this.keysDown['arrowdown'] || this.touchState.down;
     let targetX, targetY;
     const blockSize = 36;
@@ -252,13 +274,12 @@ class GameEngine {
       targetY = Math.round(this.myPlayer.y / blockSize) * blockSize;
     }
 
-    // Keep inside bounds
     if (targetX < 10) targetX = 10;
-    if (targetX > CANVAS_WIDTH - blockSize - 10) targetX = CANVAS_WIDTH - blockSize - 10;
+    if (targetX > this.currentLevel.width - blockSize - 10) targetX = this.currentLevel.width - blockSize - 10;
     if (targetY < 20) targetY = 20;
     if (targetY > CANVAS_HEIGHT - blockSize - 10) targetY = CANVAS_HEIGHT - blockSize - 10;
 
-    // Check collision with solid platforms to prevent building inside ground
+    // Prevent placing inside solid ground
     const overlapsPlatform = this.currentLevel.platforms.some(plat => {
       if (plat.type === 'barrier' && this.isBarrierLowered(plat.id)) return false;
       return this.checkOverlap({ x: targetX, y: targetY, width: blockSize, height: blockSize }, plat);
@@ -266,7 +287,6 @@ class GameEngine {
 
     if (overlapsPlatform) return;
 
-    // Send to socket
     if (window.networkManager) {
       window.networkManager.emitCreateBlock({
         x: targetX,
@@ -276,9 +296,11 @@ class GameEngine {
       });
     }
 
-    // Sound and particle
     window.audioManager && window.audioManager.playBlockPlace();
     this.createSpawnSparks(targetX + blockSize / 2, targetY + blockSize / 2, this.myPlayer.color);
+    
+    // Check if placed block squashes an enemy underneath
+    this.checkBlockSquashEnemy({ x: targetX, y: targetY, width: blockSize, height: blockSize });
   }
 
   requestClearBlocks() {
@@ -287,16 +309,35 @@ class GameEngine {
     }
     window.audioManager && window.audioManager.playBlockClear();
     this.addFloatingText(this.myPlayer.x, this.myPlayer.y - 20, "Balok Dihapus!", '#ffc107', 14);
+
+    // Create dissolve shards
+    const myBlocks = this.blocks.filter(b => b.playerSlot === this.localSlot);
+    for (const b of myBlocks) {
+      for (let i = 0; i < 8; i++) {
+        this.particles.push({
+          type: 'spark',
+          x: b.x + Math.random() * b.width,
+          y: b.y + Math.random() * b.height,
+          vx: (Math.random() - 0.5) * 4,
+          vy: -Math.random() * 3,
+          color: b.color,
+          radius: 3,
+          alpha: 1,
+          life: 0.6
+        });
+      }
+    }
   }
 
   isBarrierLowered(barrierId) {
-    // Check if any button linking to this barrier is pressed
     const btn = this.currentLevel.buttons.find(b => b.linkedBarrierId === barrierId);
     if (!btn) return false;
     return this.pressedButtons.includes(btn.id);
   }
 
-  // Main Loop
+  // ========================================================
+  // MAIN LOOP & UPDATES
+  // ========================================================
   start() {
     if (this.gameRunning) return;
     this.gameRunning = true;
@@ -314,8 +355,12 @@ class GameEngine {
   }
 
   update(dt) {
+    this.updateMovingPlatforms(dt);
     this.updateLocalPlayer(dt);
     this.updatePeerInterpolation(dt);
+    this.updateCamera(dt);
+    this.updateSprings();
+    this.updateEnemies(dt);
     this.updateButtons();
     this.updateKeys();
     this.updateDoor();
@@ -328,8 +373,66 @@ class GameEngine {
     }
   }
 
+  // Synchronized Moving Platforms
+  updateMovingPlatforms(dt) {
+    if (!this.currentLevel.movingPlatforms) return;
+    const elapsed = (Date.now() - this.levelStartTime) / 1000;
+
+    for (const mp of this.currentLevel.movingPlatforms) {
+      const cycle = Math.sin(elapsed * mp.speed);
+      const prevX = mp.currentX || mp.x;
+      const prevY = mp.currentY || mp.y;
+
+      // Interpolate between start and end
+      mp.currentX = mp.startX + (mp.endX - mp.startX) * ((cycle + 1) / 2);
+      mp.currentY = mp.startY + (mp.endY - mp.startY) * ((cycle + 1) / 2);
+
+      this.movingPlatformDeltas[mp.id] = {
+        dx: mp.currentX - prevX,
+        dy: mp.currentY - prevY
+      };
+
+      // Carry player if standing on it
+      const mpBox = { x: mp.currentX, y: mp.currentY, width: mp.width, height: mp.height };
+      const feetBox = { x: this.myPlayer.x, y: this.myPlayer.y + this.myPlayer.height - 2, width: this.myPlayer.width, height: 6 };
+
+      if (this.checkOverlap(feetBox, mpBox) && this.myPlayer.vy >= 0) {
+        this.myPlayer.x += this.movingPlatformDeltas[mp.id].dx;
+        this.myPlayer.y += this.movingPlatformDeltas[mp.id].dy;
+      }
+    }
+  }
+
+  // Camera 2.5D with smooth tracking and subtle 3D tilt
+  updateCamera(dt) {
+    // Focus camera between both players if connected, or follow myPlayer
+    let targetFocusX = this.myPlayer.x + this.myPlayer.width / 2;
+    if (this.peerPlayer.connected) {
+      targetFocusX = (this.myPlayer.x + this.peerPlayer.x) / 2 + 16;
+    }
+
+    // Lead camera slightly in facing direction
+    targetFocusX += this.myPlayer.facing * 35;
+
+    // Clamp camera within level bounds
+    const maxCamX = Math.max(0, this.currentLevel.width - CANVAS_WIDTH);
+    this.camera.targetX = Math.max(0, Math.min(maxCamX, targetFocusX - CANVAS_WIDTH / 2));
+
+    // Smooth lerp
+    const camDiff = this.camera.targetX - this.camera.x;
+    this.camera.x += camDiff * 0.09;
+
+    // Dynamic camera lean based on camera speed (gives subtle 3D feel!)
+    this.camera.tilt = Math.max(-0.02, Math.min(0.02, camDiff * 0.0004));
+  }
+
   updateLocalPlayer(dt) {
     const p = this.myPlayer;
+
+    if (p.hurtTimer > 0) {
+      p.hurtTimer -= dt;
+      return;
+    }
 
     // Horizontal movement
     const left = this.keysDown['a'] || this.keysDown['arrowleft'] || this.touchState.left;
@@ -338,12 +441,22 @@ class GameEngine {
     if (left && !right) {
       p.vx = -this.MOVE_SPEED;
       p.facing = -1;
+      p.walkTime += dt;
+      p.tilt = -0.08;
+      p.expression = 'walk';
     } else if (right && !left) {
       p.vx = this.MOVE_SPEED;
       p.facing = 1;
+      p.walkTime += dt;
+      p.tilt = 0.08;
+      p.expression = 'walk';
     } else {
       p.vx *= this.FRICTION;
-      if (Math.abs(p.vx) < 0.08) p.vx = 0;
+      p.tilt *= 0.75;
+      if (Math.abs(p.vx) < 0.08) {
+        p.vx = 0;
+        p.expression = 'idle';
+      }
     }
 
     // Coyote time & jump buffer
@@ -361,6 +474,7 @@ class GameEngine {
         p.isGrounded = false;
         p.squashX = 0.75;
         p.squashY = 1.35;
+        p.expression = 'jump';
         window.audioManager && window.audioManager.playJump();
         this.createDust(p.x + p.width / 2, p.y + p.height);
       } else {
@@ -378,6 +492,10 @@ class GameEngine {
     p.vy += this.GRAVITY;
     if (p.vy > 14) p.vy = 14;
 
+    if (p.vy > 2) {
+      p.expression = 'fall';
+    }
+
     // Move X and collide
     p.x += p.vx;
     this.resolveCollisionsX(p);
@@ -388,8 +506,8 @@ class GameEngine {
     this.resolveCollisionsY(p);
 
     // Bounce squash and stretch back to 1
-    p.squashX += (1 - p.squashX) * 0.15;
-    p.squashY += (1 - p.squashY) * 0.15;
+    p.squashX += (1 - p.squashX) * 0.16;
+    p.squashY += (1 - p.squashY) * 0.16;
 
     // Blinking
     p.blinkTimer--;
@@ -401,10 +519,10 @@ class GameEngine {
     // Check Spikes / Void
     this.checkHazards(p);
 
-    // Keep in canvas borders
+    // Boundaries
     if (p.x < 0) p.x = 0;
-    if (p.x > CANVAS_WIDTH - p.width) p.x = CANVAS_WIDTH - p.width;
-    if (p.y > CANVAS_HEIGHT + 60) {
+    if (p.x > this.currentLevel.width - p.width) p.x = this.currentLevel.width - p.width;
+    if (p.y > CANVAS_HEIGHT + 70) {
       this.handlePlayerHurt(p);
     }
 
@@ -417,6 +535,10 @@ class GameEngine {
         vy: p.vy,
         facing: p.facing,
         isGrounded: p.isGrounded,
+        tilt: p.tilt,
+        squashX: p.squashX,
+        squashY: p.squashY,
+        expression: p.expression,
         anim: Math.abs(p.vx) > 0.5 ? 'walk' : 'idle'
       });
     }
@@ -426,17 +548,100 @@ class GameEngine {
     const peer = this.peerPlayer;
     if (!peer.connected) return;
 
-    // Smooth lerp to target position received from socket
     peer.x += (peer.targetX - peer.x) * 0.35;
     peer.y += (peer.targetY - peer.y) * 0.35;
 
-    peer.squashX += (1 - peer.squashX) * 0.15;
-    peer.squashY += (1 - peer.squashY) * 0.15;
+    peer.squashX += (1 - peer.squashX) * 0.16;
+    peer.squashY += (1 - peer.squashY) * 0.16;
 
     peer.blinkTimer--;
     if (peer.blinkTimer <= 0) {
       peer.isBlinking = !peer.isBlinking;
       peer.blinkTimer = peer.isBlinking ? 8 : (Math.random() * 120 + 80);
+    }
+  }
+
+  // Springs / Bounce Trampoline Pads
+  updateSprings() {
+    if (!this.currentLevel.springs) return;
+    for (const sp of this.currentLevel.springs) {
+      if (this.checkOverlap(this.myPlayer, sp) && this.myPlayer.vy > 0) {
+        this.myPlayer.vy = sp.bounceForce;
+        this.myPlayer.isGrounded = false;
+        this.myPlayer.squashX = 0.65;
+        this.myPlayer.squashY = 1.45;
+        this.myPlayer.expression = 'jump';
+        window.audioManager && window.audioManager.playSpringBounce();
+        this.createSpawnSparks(sp.x + sp.width / 2, sp.y, '#00ffcc');
+      }
+    }
+  }
+
+  // Enemies (Patrolling Spike Slimes & Flying Drones)
+  updateEnemies(dt) {
+    if (!this.currentLevel.enemies) return;
+    const elapsed = (Date.now() - this.levelStartTime) / 1000;
+
+    for (const en of this.currentLevel.enemies) {
+      if (this.defeatedEnemies.includes(en.id)) continue;
+
+      if (en.type === 'patroller') {
+        // Linear bounce patrol
+        if (!en.direction) en.direction = 1;
+        en.x += en.direction * en.speed;
+        if (en.x > en.maxX) {
+          en.x = en.maxX;
+          en.direction = -1;
+        } else if (en.x < en.minX) {
+          en.x = en.minX;
+          en.direction = 1;
+        }
+      } else if (en.type === 'flying') {
+        // Sinusoidal floating wave
+        const cycle = (Math.sin(elapsed * en.frequency) + 1) / 2;
+        en.x = en.minX + (en.maxX - en.minX) * cycle;
+        en.y = en.baseY + Math.cos(elapsed * en.frequency * 1.5) * en.amplitude;
+      }
+
+      // Check collision with player
+      const enBox = { x: en.x, y: en.y, width: en.width, height: en.height };
+      if (this.checkOverlap(this.myPlayer, enBox)) {
+        // If player is landing on top of patroller -> stomp defeat!
+        if (this.myPlayer.vy > 1 && (this.myPlayer.y + this.myPlayer.height) < en.y + 12) {
+          this.defeatEnemy(en.id);
+          this.myPlayer.vy = -9; // Bounce up
+        } else {
+          this.handlePlayerHurt(this.myPlayer);
+        }
+      }
+    }
+  }
+
+  checkBlockSquashEnemy(blockBox) {
+    if (!this.currentLevel.enemies) return;
+    for (const en of this.currentLevel.enemies) {
+      if (this.defeatedEnemies.includes(en.id)) continue;
+      const enBox = { x: en.x, y: en.y, width: en.width, height: en.height };
+      if (this.checkOverlap(blockBox, enBox)) {
+        this.defeatEnemy(en.id);
+      }
+    }
+  }
+
+  defeatEnemy(enemyId) {
+    if (this.defeatedEnemies.includes(enemyId)) return;
+    this.defeatedEnemies.push(enemyId);
+    window.audioManager && window.audioManager.playEnemyDefeat();
+    this.screenShake = 5;
+
+    const en = this.currentLevel.enemies.find(e => e.id === enemyId);
+    if (en) {
+      this.createSpawnSparks(en.x + en.width / 2, en.y + en.height / 2, '#ff007f');
+      this.addFloatingText(en.x, en.y - 20, "K.O! ⭐", '#ffd700', 18);
+    }
+
+    if (window.networkManager) {
+      window.networkManager.emitDefeatEnemy(enemyId);
     }
   }
 
@@ -456,7 +661,6 @@ class GameEngine {
 
   resolveCollisionsY(p) {
     const solidBoxes = this.getAllSolidBoxes();
-    // Also player can stand on peer's head!
     if (this.peerPlayer.connected) {
       solidBoxes.push({
         x: this.peerPlayer.x,
@@ -472,7 +676,6 @@ class GameEngine {
           p.y = b.y - p.height;
           p.vy = 0;
           p.isGrounded = true;
-          // Landing squash
           if (p.vy > 3) {
             p.squashX = 1.25;
             p.squashY = 0.8;
@@ -494,6 +697,17 @@ class GameEngine {
         continue;
       }
       solids.push(plat);
+    }
+    // Moving platforms
+    if (this.currentLevel.movingPlatforms) {
+      for (const mp of this.currentLevel.movingPlatforms) {
+        solids.push({
+          x: mp.currentX || mp.x,
+          y: mp.currentY || mp.y,
+          width: mp.width,
+          height: mp.height
+        });
+      }
     }
     // Placed blocks
     for (const blk of this.blocks) {
@@ -522,11 +736,11 @@ class GameEngine {
 
   handlePlayerHurt(p) {
     window.audioManager && window.audioManager.playHurt();
-    this.screenShake = 6;
+    this.screenShake = 8;
     this.createSpawnSparks(p.x + p.width / 2, p.y + p.height / 2, '#ff1744');
     this.addFloatingText(p.x, p.y - 20, "Ouch!", '#ff1744', 18);
     
-    // Respawn to starting platform
+    // Respawn to start
     const sp = this.currentLevel.spawns;
     const spawnPos = p.slot === 1 ? sp.p1 : sp.p2;
     p.x = spawnPos.x;
@@ -544,7 +758,6 @@ class GameEngine {
         height: btn.height + 6
       };
 
-      // Check if player or block or peer is pressing it
       const myPressed = this.checkOverlap(this.myPlayer, buttonTriggerArea);
       const peerPressed = this.peerPlayer.connected && this.checkOverlap(this.peerPlayer, buttonTriggerArea);
       const blockPressed = this.blocks.some(b => this.checkOverlap(b, buttonTriggerArea));
@@ -570,7 +783,7 @@ class GameEngine {
   updateKeys() {
     for (const key of this.currentLevel.keys) {
       if (this.collectedKeys.includes(key.id)) continue;
-      const keyBox = { x: key.x - 12, y: key.y - 12, width: 24, height: 24 };
+      const keyBox = { x: key.x - 14, y: key.y - 14, width: 28, height: 28 };
 
       if (this.checkOverlap(this.myPlayer, keyBox)) {
         this.collectedKeys.push(key.id);
@@ -583,10 +796,9 @@ class GameEngine {
           window.networkManager.emitCollectKey(key.id);
         }
 
-        // Check if all keys collected
         if (this.collectedKeys.length === this.currentLevel.keys.length) {
           window.audioManager && window.audioManager.playDoorOpen();
-          this.addFloatingText(CANVAS_WIDTH / 2, 100, "PINTU TERBUKA! PERGI KE PINTU! 🚪✨", '#00ffcc', 22);
+          this.addFloatingText(this.myPlayer.x, this.myPlayer.y - 45, "PINTU TERBUKA! PERGI KE PINTU! 🚪✨", '#00ffcc', 20);
         }
       }
     }
@@ -608,7 +820,6 @@ class GameEngine {
     this.peerPlayer.atDoor = peerAtDoor;
 
     if (myAtDoor && peerAtDoor) {
-      // Level complete celebration!
       this.createVictoryConfetti();
     }
   }
@@ -623,13 +834,11 @@ class GameEngine {
 
   updateCoupleLoveHearts() {
     if (!this.peerPlayer.connected) return;
-    // Calculate distance between Bobi and Bona
     const dx = (this.myPlayer.x + 16) - (this.peerPlayer.x + 16);
     const dy = (this.myPlayer.y + 16) - (this.peerPlayer.y + 16);
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // When couple stands close together, spawn sweet floating heart particles!
-    if (dist < 60 && Math.random() < 0.08) {
+    if (dist < 65 && Math.random() < 0.09) {
       const midX = (this.myPlayer.x + this.peerPlayer.x) / 2 + 16;
       const midY = (this.myPlayer.y + this.peerPlayer.y) / 2;
       this.particles.push({
@@ -637,7 +846,7 @@ class GameEngine {
         x: midX + (Math.random() * 20 - 10),
         y: midY,
         vx: (Math.random() - 0.5) * 0.8,
-        vy: -1.2 - Math.random() * 0.8,
+        vy: -1.3 - Math.random() * 0.8,
         scale: 0.8 + Math.random() * 0.5,
         alpha: 1,
         life: 1
@@ -682,10 +891,10 @@ class GameEngine {
   createVictoryConfetti() {
     if (Math.random() < 0.4) {
       const colors = ['#00e5ff', '#ff3b77', '#ffd700', '#00ff88', '#ffffff', '#e040fb'];
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 6; i++) {
         this.particles.push({
           type: 'confetti',
-          x: Math.random() * CANVAS_WIDTH,
+          x: this.camera.x + Math.random() * CANVAS_WIDTH,
           y: -10,
           vx: (Math.random() - 0.5) * 3,
           vy: 2 + Math.random() * 4,
@@ -763,9 +972,9 @@ class GameEngine {
     }
   }
 
-  // ==========================================
-  // RENDER ENGINE
-  // ==========================================
+  // ========================================================
+  // RENDER ENGINE WITH 2.5D MULTI-LAYER PARALLAX & CAMERA TILT
+  // ========================================================
   render() {
     const ctx = this.ctx;
     ctx.save();
@@ -777,93 +986,279 @@ class GameEngine {
       ctx.translate(shakeX, shakeY);
     }
 
-    // Background Gradient (Cyber-cute twilight sky)
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
-    skyGrad.addColorStop(0, '#0d1326');
-    skyGrad.addColorStop(0.6, '#1a1f3c');
-    skyGrad.addColorStop(1, '#2b1b3d');
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    // LAYER 1: Distant Background (Parallax 0.05x)
+    this.renderParallaxBackground(ctx);
 
-    // Decorative grid/stars background
-    this.renderBackgroundDetails(ctx);
+    // Apply 2.5D Camera Translation & Dynamic Horizontal Tilt
+    ctx.save();
+    ctx.translate(-this.camera.x, 0);
 
-    // Platforms & Terrain
+    // Subtle 3D camera lean
+    if (Math.abs(this.camera.tilt) > 0.001) {
+      ctx.transform(1, 0, this.camera.tilt, 1, 0, 0);
+    }
+
+    // LAYER 2: Mid-ground Structures (Parallax 0.4x)
+    this.renderMidgroundParallax(ctx);
+
+    // LAYER 3: Main World Elements
     this.renderPlatforms(ctx);
-
-    // Spikes (Jalan Berlubang / Hazard)
+    this.renderMovingPlatforms(ctx);
     this.renderSpikes(ctx);
-
-    // Buttons / Pressure Plates
+    this.renderSprings(ctx);
     this.renderButtons(ctx);
-
-    // Exit Door
     this.renderDoor(ctx);
-
-    // Keys
     this.renderKeys(ctx);
-
-    // Placed Blocks
     this.renderBlocks(ctx);
+    this.renderEnemies(ctx);
 
-    // Characters (Bobi & Bona)
+    // Characters
     if (this.peerPlayer.connected) {
       this.renderCharacter(ctx, this.peerPlayer);
     }
     this.renderCharacter(ctx, this.myPlayer);
 
-    // Particles & FX
+    // In-world particles
     this.renderParticles(ctx);
 
-    // Floating Emotes & Texts
+    // Overlays (Emotes, Floating texts)
     this.renderOverlays(ctx);
+
+    ctx.restore(); // Restore camera translation
+
+    // LAYER 4: Foreground Ambient Parallax (Floating Stardust/Spores)
+    this.renderForegroundDust(ctx);
 
     ctx.restore();
   }
 
-  renderBackgroundDetails(ctx) {
-    // Subtle star dots
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-    for (let i = 0; i < 40; i++) {
-      const x = ((i * 137) % CANVAS_WIDTH);
-      const y = ((i * 83) % (CANVAS_HEIGHT - 100));
-      ctx.fillRect(x, y, 2, 2);
+  // Multi-layer Parallax Sky & Cyber Mountains
+  renderParallaxBackground(ctx) {
+    // Deep twilight gradient
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+    skyGrad.addColorStop(0, '#090d1a');
+    skyGrad.addColorStop(0.5, '#12182c');
+    skyGrad.addColorStop(1, '#241a38');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Distant Stars (scrolling slowly at 0.05x)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    for (let i = 0; i < 50; i++) {
+      const sx = ((i * 149 - this.camera.x * 0.05) % CANVAS_WIDTH + CANVAS_WIDTH) % CANVAS_WIDTH;
+      const sy = (i * 97) % (CANVAS_HEIGHT - 120);
+      ctx.fillRect(sx, sy, (i % 3 === 0) ? 2.5 : 1.5, (i % 3 === 0) ? 2.5 : 1.5);
+    }
+
+    // Distant Cyber Mountains silhouette (0.12x)
+    const mtnOffset = -this.camera.x * 0.12;
+    ctx.fillStyle = 'rgba(23, 28, 54, 0.6)';
+    ctx.beginPath();
+    ctx.moveTo(0, CANVAS_HEIGHT);
+    for (let x = 0; x <= CANVAS_WIDTH + 100; x += 80) {
+      const peakY = 280 + Math.sin((x - mtnOffset) * 0.008) * 80 + Math.cos((x - mtnOffset) * 0.02) * 30;
+      ctx.lineTo(x, peakY);
+    }
+    ctx.lineTo(CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Midground floating pillars and neon skylines (0.35x)
+  renderMidgroundParallax(ctx) {
+    const mgOffset = this.camera.x * 0.65;
+    ctx.fillStyle = 'rgba(38, 45, 84, 0.45)';
+    for (let i = 0; i < 16; i++) {
+      const px = i * 220 + 40;
+      const py = 220 + ((i * 47) % 140);
+      ctx.fillRect(px, py, 60, CANVAS_HEIGHT - py);
+      
+      // Neon edge
+      ctx.fillStyle = 'rgba(0, 229, 255, 0.2)';
+      ctx.fillRect(px, py, 60, 3);
+      ctx.fillStyle = 'rgba(38, 45, 84, 0.45)';
     }
   }
 
+  // 3D-Look Platforms with Depth Extrusion
   renderPlatforms(ctx) {
     for (const p of this.currentLevel.platforms) {
       if (p.type === 'barrier') {
         const lowered = this.isBarrierLowered(p.id);
-        if (lowered) continue; // Lowered barrier is open!
+        if (lowered) continue;
 
         // Laser barrier look
-        ctx.fillStyle = 'rgba(255, 40, 80, 0.7)';
+        ctx.fillStyle = 'rgba(255, 40, 80, 0.75)';
         ctx.fillRect(p.x, p.y, p.width, p.height);
 
         ctx.strokeStyle = '#ff1744';
         ctx.lineWidth = 3;
         ctx.strokeRect(p.x, p.y, p.width, p.height);
 
-        // Animated laser stripe
         ctx.fillStyle = '#ffffff';
-        const stripeY = p.y + ((this.animTime * 120) % p.height);
+        const stripeY = p.y + ((this.animTime * 140) % p.height);
         ctx.fillRect(p.x, stripeY, p.width, 4);
         continue;
       }
 
-      // Solid ground platforms
-      // Top grassy/neon rim
-      ctx.fillStyle = '#303f9f';
+      // 3D Extrusion Side (Simulating block thickness/depth)
+      const depthY = 12;
+      ctx.fillStyle = '#171e3d';
+      ctx.fillRect(p.x, p.y + p.height, p.width, depthY);
+
+      // Main Platform Body
+      ctx.fillStyle = '#263366';
       ctx.fillRect(p.x, p.y, p.width, p.height);
 
+      // Top Cyber Grass/Rim (Neon Cyan)
       ctx.fillStyle = '#00e5ff';
-      ctx.fillRect(p.x, p.y, p.width, 5);
+      ctx.fillRect(p.x, p.y, p.width, 6);
 
-      // Subtle border
-      ctx.strokeStyle = 'rgba(0, 229, 255, 0.4)';
+      // Subtle 3D grid line
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.35)';
       ctx.lineWidth = 1.5;
       ctx.strokeRect(p.x, p.y, p.width, p.height);
+    }
+  }
+
+  // Moving Platforms (with glowing gears / hover pads)
+  renderMovingPlatforms(ctx) {
+    if (!this.currentLevel.movingPlatforms) return;
+    for (const mp of this.currentLevel.movingPlatforms) {
+      const x = mp.currentX || mp.x;
+      const y = mp.currentY || mp.y;
+
+      ctx.save();
+      // 3D Side
+      ctx.fillStyle = '#1e1b4b';
+      ctx.fillRect(x, y + mp.height, mp.width, 6);
+
+      // Platform body
+      ctx.fillStyle = '#4338ca';
+      this.drawRoundedRect(ctx, x, y, mp.width, mp.height, 4);
+      ctx.fill();
+
+      // Top glowing neon bar
+      ctx.fillStyle = '#a855f7';
+      ctx.fillRect(x + 2, y, mp.width - 4, 4);
+
+      // Glowing thrusters underneath
+      ctx.fillStyle = '#00ffcc';
+      ctx.fillRect(x + 12, y + mp.height + 4, 12, 4);
+      ctx.fillRect(x + mp.width - 24, y + mp.height + 4, 12, 4);
+
+      ctx.strokeStyle = '#c084fc';
+      ctx.lineWidth = 1.5;
+      this.drawRoundedRect(ctx, x, y, mp.width, mp.height, 4);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+  }
+
+  // Springs / Bounce Trampoline Pads
+  renderSprings(ctx) {
+    if (!this.currentLevel.springs) return;
+    for (const sp of this.currentLevel.springs) {
+      ctx.save();
+      // Base
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(sp.x, sp.y + 8, sp.width, 6);
+
+      // Coiled Spring
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(sp.x + 8, sp.y + 8);
+      ctx.lineTo(sp.x + 18, sp.y + 4);
+      ctx.lineTo(sp.x + 26, sp.y + 8);
+      ctx.stroke();
+
+      // Top pad
+      ctx.fillStyle = '#f59e0b';
+      this.drawRoundedRect(ctx, sp.x, sp.y, sp.width, 6, 3);
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
+  // Enemies (Spike Slimes & Flying Drones)
+  renderEnemies(ctx) {
+    if (!this.currentLevel.enemies) return;
+    const elapsed = (Date.now() - this.levelStartTime) / 1000;
+
+    for (const en of this.currentLevel.enemies) {
+      if (this.defeatedEnemies.includes(en.id)) continue;
+
+      ctx.save();
+      if (en.type === 'patroller') {
+        // Spike Slime
+        const squish = Math.sin(elapsed * 8) * 0.15;
+        ctx.translate(en.x + en.width / 2, en.y + en.height);
+        ctx.scale(1 + squish, 1 - squish);
+
+        // Body
+        ctx.fillStyle = '#ec4899';
+        ctx.beginPath();
+        ctx.arc(0, -en.height / 2, en.width / 2, Math.PI, 0);
+        ctx.lineTo(en.width / 2, 0);
+        ctx.lineTo(-en.width / 2, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // Top spike
+        ctx.fillStyle = '#be185d';
+        ctx.beginPath();
+        ctx.moveTo(0, -en.height - 4);
+        ctx.lineTo(6, -en.height + 2);
+        ctx.lineTo(-6, -en.height + 2);
+        ctx.closePath();
+        ctx.fill();
+
+        // Animated Slime Eye looking at player
+        const lookDir = this.myPlayer.x < en.x ? -2.5 : 2.5;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(0, -en.height / 2, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#831843';
+        ctx.beginPath();
+        ctx.arc(lookDir, -en.height / 2, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (en.type === 'flying') {
+        // Glitch Cyber Drone
+        ctx.translate(en.x + en.width / 2, en.y + en.height / 2);
+
+        // Rotating rotor blades
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = 2;
+        const bladeW = Math.cos(elapsed * 25) * 16;
+        ctx.beginPath();
+        ctx.moveTo(-bladeW, -en.height / 2 - 2);
+        ctx.lineTo(bladeW, -en.height / 2 - 2);
+        ctx.stroke();
+
+        // Drone metallic body
+        ctx.fillStyle = '#374151';
+        this.drawRoundedRect(ctx, -en.width / 2, -en.height / 2, en.width, en.height, 6);
+        ctx.fill();
+
+        // Glowing red sensor scanner
+        ctx.fillStyle = '#ef4444';
+        ctx.shadowColor = '#ef4444';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(0, 0, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#9ca3af';
+        ctx.lineWidth = 1.5;
+        this.drawRoundedRect(ctx, -en.width / 2, -en.height / 2, en.width, en.height, 6);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
   }
 
@@ -885,7 +1280,6 @@ class GameEngine {
         ctx.stroke();
       }
 
-      // Red ominous hazard glow in pit
       ctx.fillStyle = 'rgba(255, 23, 68, 0.25)';
       ctx.fillRect(sp.x, sp.y + 6, sp.width, sp.height);
     }
@@ -897,11 +1291,9 @@ class GameEngine {
       const h = isPressed ? b.height * 0.4 : b.height;
       const y = isPressed ? b.y + b.height * 0.6 : b.y;
 
-      // Base plate
       ctx.fillStyle = '#37474f';
       ctx.fillRect(b.x - 4, b.y + b.height - 4, b.width + 8, 4);
 
-      // Pressure pad
       ctx.fillStyle = isPressed ? '#00e676' : '#ffd600';
       ctx.fillRect(b.x, y, b.width, h);
 
@@ -922,9 +1314,7 @@ class GameEngine {
     ctx.lineWidth = 3;
     ctx.strokeRect(d.x - 4, d.y - 4, d.width + 8, d.height + 4);
 
-    // Door interior
     if (allKeysCollected) {
-      // Swirling portal gradient
       const portalGrad = ctx.createLinearGradient(d.x, d.y, d.x + d.width, d.y + d.height);
       portalGrad.addColorStop(0, '#00e5ff');
       portalGrad.addColorStop(0.5, '#7c4dff');
@@ -932,22 +1322,18 @@ class GameEngine {
       ctx.fillStyle = portalGrad;
       ctx.fillRect(d.x, d.y, d.width, d.height);
 
-      // Heart emblem in portal center
       ctx.font = '22px Arial';
       ctx.textAlign = 'center';
       ctx.fillText('💖', d.x + d.width / 2, d.y + d.height / 2 + 8);
     } else {
-      // Locked wooden/metal door
       ctx.fillStyle = '#334155';
       ctx.fillRect(d.x, d.y, d.width, d.height);
 
-      // Lock icon
       ctx.font = '20px Arial';
       ctx.textAlign = 'center';
       ctx.fillText('🔒', d.x + d.width / 2, d.y + d.height / 2 + 8);
     }
 
-    // Door readiness indicator
     const playersAtDoorCount = (this.myPlayer.atDoor ? 1 : 0) + (this.peerPlayer.atDoor ? 1 : 0);
     if (allKeysCollected) {
       ctx.fillStyle = '#ffffff';
@@ -960,17 +1346,14 @@ class GameEngine {
   renderKeys(ctx) {
     for (const k of this.currentLevel.keys) {
       if (this.collectedKeys.includes(k.id)) continue;
-      // Floating sine wave animation
       const bob = Math.sin(this.animTime * 4 + k.x) * 6;
 
       ctx.save();
       ctx.translate(k.x, k.y + bob);
 
-      // Outer glow
       ctx.shadowColor = '#ffd700';
       ctx.shadowBlur = 14;
 
-      // Golden Key graphic
       ctx.fillStyle = '#ffd700';
       ctx.beginPath();
       ctx.arc(0, -6, 7, 0, Math.PI * 2);
@@ -997,7 +1380,6 @@ class GameEngine {
       ctx.shadowColor = b.color;
       ctx.shadowBlur = 8;
 
-      // Rounded block
       this.drawRoundedRect(ctx, b.x, b.y, b.width, b.height, 6);
       ctx.fill();
 
@@ -1006,8 +1388,8 @@ class GameEngine {
       this.drawRoundedRect(ctx, b.x + 3, b.y + 3, b.width - 6, 8, 3);
       ctx.fill();
 
-      // Center cute pattern
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      // Cute pattern
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
       ctx.font = '14px Arial';
       ctx.textAlign = 'center';
       ctx.fillText(b.playerSlot === 1 ? '❄️' : '🌸', b.x + b.width / 2, b.y + b.height / 2 + 5);
@@ -1021,12 +1403,16 @@ class GameEngine {
     }
   }
 
+  // Highly Expressive Cube Characters (Bobi & Bona)
   renderCharacter(ctx, p) {
     ctx.save();
     const cx = p.x + p.width / 2;
     const cy = p.y + p.height / 2;
 
     ctx.translate(cx, cy);
+
+    // Apply movement tilt & squash
+    ctx.rotate(p.tilt || 0);
     ctx.scale(p.squashX, p.squashY);
 
     const w = p.width;
@@ -1034,7 +1420,7 @@ class GameEngine {
     const halfW = w / 2;
     const halfH = h / 2;
 
-    // Body glow & main box
+    // Body shadow & box
     ctx.shadowColor = p.color;
     ctx.shadowBlur = 10;
     ctx.fillStyle = p.color;
@@ -1046,17 +1432,18 @@ class GameEngine {
     this.drawRoundedRect(ctx, -halfW + 3, -halfH + 3, w - 6, 6, 3);
     ctx.fill();
 
-    // Cheeks blush
-    ctx.fillStyle = p.slot === 1 ? 'rgba(0, 150, 255, 0.5)' : 'rgba(255, 60, 120, 0.6)';
+    // Rosy Cheeks
+    ctx.fillStyle = p.slot === 1 ? 'rgba(0, 150, 255, 0.55)' : 'rgba(255, 60, 120, 0.65)';
     ctx.beginPath();
     ctx.arc(-halfW + 6, 4, 3.5, 0, Math.PI * 2);
     ctx.arc(halfW - 6, 4, 3.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Eyes
+    // Eyes with look-direction tracking
     const eyeOffsetX = p.facing * 3;
+    const eyeOffsetY = Math.max(-2, Math.min(2, p.vy * 0.2));
+
     if (p.isBlinking) {
-      // Blinking closed eye slits (^_^)
       ctx.strokeStyle = '#0f172a';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
@@ -1066,43 +1453,69 @@ class GameEngine {
       ctx.lineTo(7 + eyeOffsetX, -2);
       ctx.stroke();
     } else {
-      // Expressive wide sparkling eyes
-      ctx.fillStyle = '#0f172a';
-      ctx.beginPath();
-      ctx.arc(-5 + eyeOffsetX, -2, 4, 0, Math.PI * 2);
-      ctx.arc(5 + eyeOffsetX, -2, 4, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Eye glint highlights
+      // White eye sclera
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(-6 + eyeOffsetX, -4, 1.8, 0, Math.PI * 2);
-      ctx.arc(4 + eyeOffsetX, -4, 1.8, 0, Math.PI * 2);
+      ctx.arc(-5 + eyeOffsetX, -2 + eyeOffsetY, 4.5, 0, Math.PI * 2);
+      ctx.arc(5 + eyeOffsetX, -2 + eyeOffsetY, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Pupil
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(-5 + eyeOffsetX * 1.3, -2 + eyeOffsetY, 2.5, 0, Math.PI * 2);
+      ctx.arc(5 + eyeOffsetX * 1.3, -2 + eyeOffsetY, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Catchlight spark
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(-6 + eyeOffsetX * 1.3, -3 + eyeOffsetY, 1.2, 0, Math.PI * 2);
+      ctx.arc(4 + eyeOffsetX * 1.3, -3 + eyeOffsetY, 1.2, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Distinguishing accessories:
+    // Mouth Expression
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    if (p.expression === 'jump') {
+      // Cute open 'o'
+      ctx.fillStyle = '#ff6b81';
+      ctx.arc(0, 3, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (p.expression === 'fall') {
+      // Small wavy worried mouth
+      ctx.moveTo(-3, 3);
+      ctx.lineTo(3, 4);
+      ctx.stroke();
+    } else {
+      // Gentle smile
+      ctx.arc(0, 2, 3.5, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+    }
+
+    // Distinguishing accessories
     if (p.slot === 1) {
-      // Bobi: Blue Gamer Cap / Beanie
+      // Bobi's Gamer Cap
       ctx.fillStyle = '#0059b3';
       ctx.fillRect(-halfW - 2, -halfH - 4, w + 4, 6);
       ctx.fillRect(-halfW + 4, -halfH - 8, w - 8, 5);
-      // Cap visor
       ctx.fillStyle = '#003d80';
       ctx.fillRect(p.facing > 0 ? -2 : -halfW - 6, -halfH - 2, halfW + 6, 3);
     } else {
-      // Bona: Cute Ribbon Bow on top
+      // Bona's Bow Ribbon
       ctx.font = '16px Arial';
       ctx.textAlign = 'center';
       ctx.fillText('🎀', 0, -halfH - 2);
     }
 
-    // Name tag & player indicator
+    // Name tag
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    const tag = p.slot === this.localSlot ? `${p.name} (Kamu)` : p.name;
+    const tag = p.name ? (p.slot === this.localSlot ? `${p.name} (Kamu)` : p.name) : (p.slot === 1 ? 'Bobi' : 'Bona');
     ctx.fillText(tag, 0, -halfH - 14);
 
     ctx.restore();
@@ -1152,8 +1565,19 @@ class GameEngine {
     }
   }
 
+  // Foreground ambient stardust (Parallax 1.3x)
+  renderForegroundDust(ctx) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    for (let i = 0; i < 20; i++) {
+      const fx = ((i * 187 - this.camera.x * 1.3) % CANVAS_WIDTH + CANVAS_WIDTH) % CANVAS_WIDTH;
+      const fy = ((i * 113 + this.animTime * 12) % CANVAS_HEIGHT);
+      ctx.beginPath();
+      ctx.arc(fx, fy, (i % 2 === 0) ? 2 : 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   renderOverlays(ctx) {
-    // Floating texts
     for (const ft of this.floatingTexts) {
       ctx.save();
       ctx.globalAlpha = ft.alpha;
@@ -1166,7 +1590,6 @@ class GameEngine {
       ctx.restore();
     }
 
-    // Emotes
     for (const em of this.emotes) {
       ctx.save();
       ctx.globalAlpha = em.alpha;

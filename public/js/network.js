@@ -1,38 +1,57 @@
 // Socket.io Multiplayer Networking Manager
+// Supports 6-Digit Room Codes, Username Creation, Ping Health Monitor & Sync
 
 class NetworkManager {
   constructor() {
     this.socket = null;
     this.roomCode = null;
     this.slot = 1;
+    this.username = 'Pemain';
     this.game = null;
+    this.ping = 0;
+    this.pingInterval = null;
+
     this.initSocket();
   }
 
   initSocket() {
     this.socket = io({
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
       timeout: 10000
     });
 
     this.socket.on('connect', () => {
       console.log('✅ Connected to server with id:', this.socket.id);
-      // Check if URL has ?room=CODE
+      this.updateConnectionBadge('connected');
+      this.startPingMonitor();
+
+      // Check if URL has ?room=123456
       const urlParams = new URLSearchParams(window.location.search);
       const roomParam = urlParams.get('room');
       if (roomParam) {
-        document.getElementById('roomCodeInput').value = roomParam;
-        this.joinRoom(roomParam);
+        const input = document.getElementById('roomCodeInput');
+        if (input) input.value = roomParam;
       }
     });
 
+    this.socket.on('disconnect', () => {
+      console.warn('⚠️ Disconnected from server');
+      this.updateConnectionBadge('disconnected');
+    });
+
+    this.socket.on('reconnecting', () => {
+      this.updateConnectionBadge('connecting');
+    });
+
     // Room created / joined handlers
-    this.socket.on('player-joined', ({ slot, roomState }) => {
-      console.log(`[Event] Player joined: Slot ${slot}`);
+    this.socket.on('player-joined', ({ slot, name, roomState }) => {
+      console.log(`[Event] Player joined: Slot ${slot} (${name})`);
       if (this.game) {
         this.game.peerPlayer.connected = true;
+        this.game.peerPlayer.name = name;
         this.updateRoomUI(roomState);
-        this.game.addFloatingText(CANVAS_WIDTH / 2, 200, "Partner Telah Bergabung! Siap Bermain! 💕", '#00ffcc', 20);
+        this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, `${name} Telah Bergabung! 💕`, '#00ffcc', 20);
         window.audioManager && window.audioManager.playKey();
       }
     });
@@ -42,11 +61,11 @@ class NetworkManager {
       if (this.game) {
         this.game.peerPlayer.connected = false;
         this.updateRoomUI(roomState);
-        this.game.addFloatingText(CANVAS_WIDTH / 2, 200, "Partner Terputus! Menunggu... ⏳", '#ff9100', 20);
+        this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, "Partner Terputus! Menunggu... ⏳", '#ff9100', 20);
       }
     });
 
-    // Peer position sync
+    // Peer position & animation sync
     this.socket.on('peer-update', (data) => {
       if (!this.game) return;
       const peer = this.game.peerPlayer;
@@ -57,12 +76,15 @@ class NetworkManager {
       peer.vy = data.vy;
       peer.facing = data.facing;
       peer.isGrounded = data.isGrounded;
+      peer.tilt = data.tilt || 0;
+      peer.squashX = data.squashX || 1;
+      peer.squashY = data.squashY || 1;
+      peer.expression = data.expression || 'idle';
     });
 
     // Block sync
     this.socket.on('block-created', (newBlock) => {
       if (!this.game) return;
-      // Add if not already present
       if (!this.game.blocks.some(b => b.id === newBlock.id)) {
         this.game.blocks.push(newBlock);
         if (newBlock.playerSlot !== this.game.localSlot) {
@@ -101,6 +123,20 @@ class NetworkManager {
       this.game.pressedButtons = pressedButtons;
     });
 
+    // Defeated enemy sync
+    this.socket.on('enemy-defeated', ({ enemyId, bySlot }) => {
+      if (!this.game) return;
+      if (!this.game.defeatedEnemies.includes(enemyId)) {
+        this.game.defeatedEnemies.push(enemyId);
+        window.audioManager && window.audioManager.playEnemyDefeat();
+        const en = this.game.currentLevel.enemies && this.game.currentLevel.enemies.find(e => e.id === enemyId);
+        if (en) {
+          this.game.createSpawnSparks(en.x + en.width / 2, en.y + en.height / 2, '#ff007f');
+          this.game.addFloatingText(en.x, en.y - 20, "K.O! ⭐", '#ffd700', 18);
+        }
+      }
+    });
+
     // Door sync
     this.socket.on('player-door-status', ({ slot, atDoor, bothAtDoor }) => {
       if (!this.game) return;
@@ -113,16 +149,16 @@ class NetworkManager {
     this.socket.on('next-level', ({ levelIndex, roomState }) => {
       if (!this.game) return;
       window.audioManager && window.audioManager.playLevelComplete();
-      this.game.loadLevel(levelIndex);
+      this.game.loadLevel(levelIndex, roomState.levelStartTime);
       this.updateRoomUI(roomState);
     });
 
     // Restart level
     this.socket.on('level-restarted', ({ roomState }) => {
       if (!this.game) return;
-      this.game.loadLevel(roomState.levelIndex);
+      this.game.loadLevel(roomState.levelIndex, roomState.levelStartTime);
       this.updateRoomUI(roomState);
-      this.game.addFloatingText(CANVAS_WIDTH / 2, 200, "Level Direset!", '#ffd700', 22);
+      this.game.addFloatingText(this.game.myPlayer.x, 200, "Level Direset!", '#ffd700', 22);
     });
 
     // Emote sync
@@ -133,18 +169,50 @@ class NetworkManager {
     });
   }
 
-  createPrivateRoom() {
-    this.socket.emit('create-room', { isPublic: false }, (response) => {
+  startPingMonitor() {
+    if (this.pingInterval) clearInterval(this.pingInterval);
+    this.pingInterval = setInterval(() => {
+      if (!this.socket.connected) return;
+      const start = Date.now();
+      this.socket.emit('client-ping', start, (clientTime) => {
+        this.ping = Date.now() - clientTime;
+        const pingEl = document.getElementById('pingBadge');
+        if (pingEl) {
+          pingEl.innerText = `📶 ${this.ping} ms`;
+        }
+      });
+    }, 2500);
+  }
+
+  updateConnectionBadge(status) {
+    const el = document.getElementById('connectionStatus');
+    if (!el) return;
+    if (status === 'connected') {
+      el.className = 'status-badge status-green';
+      el.innerText = '🟢 Terkoneksi';
+    } else if (status === 'connecting') {
+      el.className = 'status-badge status-yellow';
+      el.innerText = '🟡 Menghubungkan...';
+    } else {
+      el.className = 'status-badge status-red';
+      el.innerText = '🔴 Terputus';
+    }
+  }
+
+  createPrivateRoom(username) {
+    this.username = username || 'Bobi';
+    this.socket.emit('create-room', { isPublic: false, username: this.username }, (response) => {
       if (response && response.success) {
         this.onRoomConnected(response.code, response.slot, response.roomState);
       } else {
-        alert('Gagal membuat room. Coba lagi.');
+        alert('Gagal membuat room. Periksa koneksi internet Anda.');
       }
     });
   }
 
-  findPublicRoom() {
-    this.socket.emit('find-public-room', (response) => {
+  findPublicRoom(username) {
+    this.username = username || 'Pemain';
+    this.socket.emit('find-public-room', { username: this.username }, (response) => {
       if (response && response.success) {
         this.onRoomConnected(response.code, response.slot, response.roomState);
       } else {
@@ -153,12 +221,14 @@ class NetworkManager {
     });
   }
 
-  joinRoom(code) {
-    if (!code) {
-      alert('Masukkan kode room terlebih dahulu!');
+  joinRoom(code, username) {
+    const cleanCode = (code || '').toString().trim();
+    if (!cleanCode || cleanCode.length !== 6 || !/^\d{6}$/.test(cleanCode)) {
+      alert('Masukkan 6 Digit Angka Kode Room yang valid!');
       return;
     }
-    this.socket.emit('join-room', { code }, (response) => {
+    this.username = username || 'Pemain';
+    this.socket.emit('join-room', { code: cleanCode, username: this.username }, (response) => {
       if (response && response.success) {
         this.onRoomConnected(response.code, response.slot, response.roomState);
       } else {
@@ -179,7 +249,7 @@ class NetworkManager {
     const hud = document.getElementById('gameHud');
     if (hud) hud.classList.remove('hidden');
 
-    // Setup URL query param so user can copy link
+    // Update URL query param so user can copy link
     const newUrl = `${window.location.origin}${window.location.pathname}?room=${code}`;
     window.history.replaceState({ path: newUrl }, '', newUrl);
 
@@ -187,11 +257,13 @@ class NetworkManager {
     if (!this.game) {
       this.game = new window.GameEngine();
       this.game.setSlot(slot);
-      this.game.loadLevel(roomState.levelIndex || 0);
+      this.game.myPlayer.name = this.username;
+      this.game.loadLevel(roomState.levelIndex || 0, roomState.levelStartTime);
       this.game.start();
     } else {
       this.game.setSlot(slot);
-      this.game.loadLevel(roomState.levelIndex || 0);
+      this.game.myPlayer.name = this.username;
+      this.game.loadLevel(roomState.levelIndex || 0, roomState.levelStartTime);
     }
 
     this.updateRoomUI(roomState);
@@ -214,16 +286,20 @@ class NetworkManager {
     const roleBadge = document.getElementById('roleBadge');
     if (roleBadge) {
       if (this.slot === 1) {
-        roleBadge.innerText = 'Kamu: Bobi (Biru 💙)';
+        roleBadge.innerText = `${this.username} (Bobi 💙)`;
         roleBadge.style.color = '#00e5ff';
       } else {
-        roleBadge.innerText = 'Kamu: Bona (Pink 💖)';
+        roleBadge.innerText = `${this.username} (Bona 💖)`;
         roleBadge.style.color = '#ff3b77';
       }
     }
 
     if (this.game && roomState.players) {
       this.game.peerPlayer.connected = roomState.players.length === 2;
+      const other = roomState.players.find(p => p.slot !== this.slot);
+      if (other) {
+        this.game.peerPlayer.name = other.name;
+      }
     }
   }
 
@@ -245,6 +321,10 @@ class NetworkManager {
 
   emitPressButton(buttonId, isPressed) {
     this.socket.emit('press-button', { buttonId, isPressed });
+  }
+
+  emitDefeatEnemy(enemyId) {
+    this.socket.emit('defeat-enemy', { enemyId });
   }
 
   emitDoorEnter(atDoor) {
