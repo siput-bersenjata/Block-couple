@@ -52,10 +52,10 @@ class GameEngine {
       jump: false
     };
 
-    // Physics constants
-    this.GRAVITY = 0.58;
-    this.MOVE_SPEED = 4.2;
-    this.JUMP_FORCE = -11.6;
+    // Physics constants - tuned for realistic, natural, and satisfying jump arcs
+    this.GRAVITY = 0.36;
+    this.MOVE_SPEED = 3.9;
+    this.JUMP_FORCE = -9.2;
     this.FRICTION = 0.82;
 
     this.animTime = 0;
@@ -378,7 +378,7 @@ class GameEngine {
     this.updateLocalPlayer(dt);
     this.updatePeerInterpolation(dt);
     this.updateCamera(dt);
-    this.updateSprings();
+    this.updateSprings(dt);
     this.updateEnemies(dt);
     this.updateButtons();
     this.updateKeys();
@@ -424,24 +424,21 @@ class GameEngine {
 
   // Camera 2.5D with smooth tracking and subtle 3D tilt
   updateCamera(dt) {
-    // Focus camera between both players if connected, or follow myPlayer
+    // Camera strictly follows THIS PLAYER's own character on their screen
     let targetFocusX = this.myPlayer.x + this.myPlayer.width / 2;
-    if (this.peerPlayer.connected) {
-      targetFocusX = (this.myPlayer.x + this.peerPlayer.x) / 2 + 16;
-    }
 
-    // Lead camera slightly in facing direction
+    // Lead camera slightly in player's facing direction for great view ahead
     targetFocusX += this.myPlayer.facing * 35;
 
     // Clamp camera within level bounds
     const maxCamX = Math.max(0, this.currentLevel.width - CANVAS_WIDTH);
     this.camera.targetX = Math.max(0, Math.min(maxCamX, targetFocusX - CANVAS_WIDTH / 2));
 
-    // Smooth lerp
+    // Smooth lerp follow
     const camDiff = this.camera.targetX - this.camera.x;
     this.camera.x += camDiff * 0.09;
 
-    // Dynamic camera lean based on camera speed (gives subtle 3D feel!)
+    // Dynamic camera lean based on movement
     this.camera.tilt = Math.max(-0.02, Math.min(0.02, camDiff * 0.0004));
   }
 
@@ -491,8 +488,8 @@ class GameEngine {
         p.coyoteTimer = 0;
         p.jumpBuffer = 0;
         p.isGrounded = false;
-        p.squashX = 0.75;
-        p.squashY = 1.35;
+        p.squashX = 0.82;
+        p.squashY = 1.25;
         p.expression = 'jump';
         window.audioManager && window.audioManager.playJump();
         this.createDust(p.x + p.width / 2, p.y + p.height);
@@ -501,17 +498,17 @@ class GameEngine {
       }
     }
 
-    // Variable jump height
+    // Variable jump height - smooth, realistic release
     const jumpHeld = this.keysDown['w'] || this.keysDown['arrowup'] || this.keysDown[' '] || this.touchState.jump;
-    if (!jumpHeld && p.vy < -4) {
-      p.vy += 0.9;
+    if (!jumpHeld && p.vy < -2.8) {
+      p.vy += 0.38;
     }
 
     // Apply gravity
     p.vy += this.GRAVITY;
-    if (p.vy > 14) p.vy = 14;
+    if (p.vy > 9.5) p.vy = 9.5;
 
-    if (p.vy > 2) {
+    if (p.vy > 1.8) {
       p.expression = 'fall';
     }
 
@@ -580,18 +577,59 @@ class GameEngine {
     }
   }
 
-  // Springs / Bounce Trampoline Pads
-  updateSprings() {
+  // Springs / Bounce Trampoline Pads (with debouncing to prevent spamming!)
+  updateSprings(dt) {
     if (!this.currentLevel.springs) return;
     for (const sp of this.currentLevel.springs) {
-      if (this.checkOverlap(this.myPlayer, sp) && this.myPlayer.vy > 0) {
-        this.myPlayer.vy = sp.bounceForce;
-        this.myPlayer.isGrounded = false;
-        this.myPlayer.squashX = 0.65;
-        this.myPlayer.squashY = 1.45;
-        this.myPlayer.expression = 'jump';
-        window.audioManager && window.audioManager.playSpringBounce();
-        this.createSpawnSparks(sp.x + sp.width / 2, sp.y, '#00ffcc');
+      if (sp.cooldown > 0) {
+        sp.cooldown -= dt;
+        if (sp.cooldown < 0) sp.cooldown = 0;
+      }
+      if (sp.squish !== undefined) {
+        sp.squish += (1 - sp.squish) * 0.16;
+      }
+
+      // Local player trampoline bounce
+      if (sp.cooldown <= 0 && this.myPlayer.vy > 0.3) {
+        const p = this.myPlayer;
+        const playerBottom = p.y + p.height;
+        const playerCenterX = p.x + p.width / 2;
+
+        // Player is coming down onto the top surface of the trampoline
+        if (playerBottom >= sp.y && playerBottom <= sp.y + sp.height + 10 &&
+            playerCenterX >= sp.x - 2 && playerCenterX <= sp.x + sp.width + 2) {
+
+          // Realistic buoyant bounce force
+          const bounce = (sp.bounceForce || -13) * 0.82;
+          p.vy = bounce;
+          p.isGrounded = false;
+          p.coyoteTimer = 0;
+          p.jumpBuffer = 0;
+          p.squashX = 0.72;
+          p.squashY = 1.38;
+          p.expression = 'jump';
+
+          sp.squish = 0.32;
+          sp.cooldown = 0.45; // 450ms cooldown prevents rapid spamming!
+
+          window.audioManager && window.audioManager.playSpringBounce();
+          this.createSpawnSparks(sp.x + sp.width / 2, sp.y, '#ffd700');
+          this.addFloatingText(p.x, p.y - 25, "LOMPAT TINGGI!", '#ffd700', 16);
+        }
+      }
+
+      // Visual response for peer player landing on spring
+      if (this.peerPlayer.connected && sp.cooldown <= 0 && this.peerPlayer.vy > 0.3) {
+        const peer = this.peerPlayer;
+        const peerBottom = peer.y + peer.height;
+        const peerCenterX = peer.x + peer.width / 2;
+
+        if (peerBottom >= sp.y && peerBottom <= sp.y + sp.height + 10 &&
+            peerCenterX >= sp.x - 2 && peerCenterX <= sp.x + sp.width + 2) {
+          sp.squish = 0.32;
+          sp.cooldown = 0.45;
+          this.createSpawnSparks(sp.x + sp.width / 2, sp.y, '#ffd700');
+        }
       }
     }
   }
@@ -1176,12 +1214,15 @@ class GameEngine {
     }
   }
 
-  // Springs / Bounce Trampoline Pads
+  // Springs / Bounce Trampoline Pads (with mechanical squish animation)
   renderSprings(ctx) {
     if (!this.currentLevel.springs) return;
     for (const sp of this.currentLevel.springs) {
       ctx.save();
-      // Base
+      const squish = sp.squish !== undefined ? sp.squish : 1;
+      const compression = (1 - squish) * 5; // Presses down when bounced
+
+      // Base plate
       ctx.fillStyle = '#334155';
       ctx.fillRect(sp.x, sp.y + 8, sp.width, 6);
 
@@ -1190,13 +1231,13 @@ class GameEngine {
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(sp.x + 8, sp.y + 8);
-      ctx.lineTo(sp.x + 18, sp.y + 4);
+      ctx.lineTo(sp.x + 18, sp.y + 4 + compression);
       ctx.lineTo(sp.x + 26, sp.y + 8);
       ctx.stroke();
 
-      // Top pad
-      ctx.fillStyle = '#f59e0b';
-      this.drawRoundedRect(ctx, sp.x, sp.y, sp.width, 6, 3);
+      // Top trampoline pad with subtle glow
+      ctx.fillStyle = sp.cooldown > 0 ? '#10b981' : '#f59e0b';
+      this.drawRoundedRect(ctx, sp.x, sp.y + compression, sp.width, 6, 3);
       ctx.fill();
 
       ctx.restore();
