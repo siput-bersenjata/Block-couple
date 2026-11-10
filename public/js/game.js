@@ -131,7 +131,7 @@ class GameEngine {
     this.respawnPlayers();
   }
 
-  loadLevel(index, startTime) {
+  loadLevel(index, startTime, restorePos = null) {
     this.currentLevelIndex = index % GAME_LEVELS.length;
     this.currentLevel = GAME_LEVELS[this.currentLevelIndex];
     this.levelStartTime = startTime || Date.now();
@@ -139,11 +139,17 @@ class GameEngine {
     this.pressedButtons = [];
     this.defeatedEnemies = [];
     this.blocks = [];
-    this.respawnPlayers();
+    this.respawnPlayers(restorePos);
 
-    // Reset camera position to start zone
-    this.camera.x = 0;
-    this.camera.targetX = 0;
+    // If restorePos given, focus camera on restored player position!
+    if (restorePos && typeof restorePos.x === 'number') {
+      const maxCamX = Math.max(0, this.currentLevel.width - CANVAS_WIDTH);
+      this.camera.x = Math.max(0, Math.min(maxCamX, restorePos.x - CANVAS_WIDTH / 2));
+      this.camera.targetX = this.camera.x;
+    } else {
+      this.camera.x = 0;
+      this.camera.targetX = 0;
+    }
 
     // Visual notification
     this.addFloatingText(this.myPlayer.x + 100, 200, this.currentLevel.title, '#ffffff', 28);
@@ -156,18 +162,30 @@ class GameEngine {
     this.updateKeyUI();
   }
 
-  respawnPlayers() {
+  respawnPlayers(restorePos = null) {
     const sp = this.currentLevel.spawns;
-    if (this.localSlot === 1) {
-      this.myPlayer.x = sp.p1.x;
-      this.myPlayer.y = sp.p1.y;
-      this.peerPlayer.x = sp.p2.x;
-      this.peerPlayer.y = sp.p2.y;
+    if (restorePos && typeof restorePos.x === 'number') {
+      // Spawn at last known position on refresh
+      this.myPlayer.x = restorePos.x;
+      this.myPlayer.y = restorePos.y;
+      if (typeof restorePos.peerX === 'number') {
+        this.peerPlayer.x = restorePos.peerX;
+        this.peerPlayer.y = restorePos.peerY;
+        this.peerPlayer.targetX = restorePos.peerX;
+        this.peerPlayer.targetY = restorePos.peerY;
+      }
     } else {
-      this.myPlayer.x = sp.p2.x;
-      this.myPlayer.y = sp.p2.y;
-      this.peerPlayer.x = sp.p1.x;
-      this.peerPlayer.y = sp.p1.y;
+      if (this.localSlot === 1) {
+        this.myPlayer.x = sp.p1.x;
+        this.myPlayer.y = sp.p1.y;
+        this.peerPlayer.x = sp.p2.x;
+        this.peerPlayer.y = sp.p2.y;
+      } else {
+        this.myPlayer.x = sp.p2.x;
+        this.myPlayer.y = sp.p2.y;
+        this.peerPlayer.x = sp.p1.x;
+        this.peerPlayer.y = sp.p1.y;
+      }
     }
     this.myPlayer.vx = 0;
     this.myPlayer.vy = 0;
@@ -542,6 +560,14 @@ class GameEngine {
       this.handlePlayerHurt(p);
     }
 
+    // Periodically save last known position for anti-refresh drop
+    if (!this.lastPosSaveTime || Date.now() - this.lastPosSaveTime > 400) {
+      this.lastPosSaveTime = Date.now();
+      if (window.networkManager) {
+        window.networkManager.saveLastPosition(p.x, p.y, this.currentLevelIndex);
+      }
+    }
+
     // Broadcast update to peer via socket
     if (window.networkManager) {
       window.networkManager.emitPlayerUpdate({
@@ -591,7 +617,7 @@ class GameEngine {
     }
   }
 
-  // Springs / Bounce Trampoline Pads (with debouncing to prevent spamming!)
+  // Springs / Bounce Trampoline Pads (Reliable launch when walking or landing on pad)
   updateSprings(dt) {
     if (!this.currentLevel.springs) return;
     for (const sp of this.currentLevel.springs) {
@@ -603,47 +629,40 @@ class GameEngine {
         sp.squish += (1 - sp.squish) * 0.16;
       }
 
+      // Trampoline hit box (generous trigger zone so walking or landing launches reliably)
+      const springHitBox = {
+        x: sp.x - 2,
+        y: sp.y - 4,
+        width: sp.width + 4,
+        height: sp.height + 6
+      };
+
       // Local player trampoline bounce
-      if (sp.cooldown <= 0 && this.myPlayer.vy > 0.3) {
+      if ((sp.cooldown || 0) <= 0 && this.checkOverlap(this.myPlayer, springHitBox)) {
         const p = this.myPlayer;
-        const playerBottom = p.y + p.height;
-        const playerCenterX = p.x + p.width / 2;
+        const bounce = (sp.bounceForce || -13) * 0.88;
+        p.vy = bounce;
+        p.y = sp.y - p.height - 3; // Lift above trampoline immediately
+        p.isGrounded = false;
+        p.coyoteTimer = 0;
+        p.jumpBuffer = 0;
+        p.squashX = 0.72;
+        p.squashY = 1.38;
+        p.expression = 'jump';
 
-        // Player is coming down onto the top surface of the trampoline
-        if (playerBottom >= sp.y && playerBottom <= sp.y + sp.height + 10 &&
-            playerCenterX >= sp.x - 2 && playerCenterX <= sp.x + sp.width + 2) {
+        sp.squish = 0.32;
+        sp.cooldown = 0.45; // 450ms cooldown prevents rapid spamming
 
-          // Realistic buoyant bounce force
-          const bounce = (sp.bounceForce || -13) * 0.82;
-          p.vy = bounce;
-          p.isGrounded = false;
-          p.coyoteTimer = 0;
-          p.jumpBuffer = 0;
-          p.squashX = 0.72;
-          p.squashY = 1.38;
-          p.expression = 'jump';
-
-          sp.squish = 0.32;
-          sp.cooldown = 0.45; // 450ms cooldown prevents rapid spamming!
-
-          window.audioManager && window.audioManager.playSpringBounce();
-          this.createSpawnSparks(sp.x + sp.width / 2, sp.y, '#ffd700');
-          this.addFloatingText(p.x, p.y - 25, "LOMPAT TINGGI!", '#ffd700', 16);
-        }
+        window.audioManager && window.audioManager.playSpringBounce();
+        this.createSpawnSparks(sp.x + sp.width / 2, sp.y, '#ffd700');
+        this.addFloatingText(p.x, p.y - 25, "LOMPAT!", '#ffd700', 16);
       }
 
-      // Visual response for peer player landing on spring
-      if (this.peerPlayer.connected && sp.cooldown <= 0 && this.peerPlayer.vy > 0.3) {
-        const peer = this.peerPlayer;
-        const peerBottom = peer.y + peer.height;
-        const peerCenterX = peer.x + peer.width / 2;
-
-        if (peerBottom >= sp.y && peerBottom <= sp.y + sp.height + 10 &&
-            peerCenterX >= sp.x - 2 && peerCenterX <= sp.x + sp.width + 2) {
-          sp.squish = 0.32;
-          sp.cooldown = 0.45;
-          this.createSpawnSparks(sp.x + sp.width / 2, sp.y, '#ffd700');
-        }
+      // Visual response for peer player touching spring
+      if (this.peerPlayer.connected && (sp.cooldown || 0) <= 0 && this.checkOverlap(this.peerPlayer, springHitBox)) {
+        sp.squish = 0.32;
+        sp.cooldown = 0.45;
+        this.createSpawnSparks(sp.x + sp.width / 2, sp.y, '#ffd700');
       }
     }
   }

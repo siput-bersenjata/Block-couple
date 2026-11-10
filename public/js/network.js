@@ -37,6 +37,9 @@ class NetworkManager {
       this.updateConnectionBadge('connected');
     }
 
+    // Start real-time presence heartbeat to track actual active users
+    this.startPresenceHeartbeat();
+
     // Auto-fill room code from URL ?room=123456
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
@@ -46,9 +49,68 @@ class NetworkManager {
     }
   }
 
+  // Real-time server presence & match statistics tracker
+  startPresenceHeartbeat() {
+    let deviceId = localStorage.getItem('bc_device_id');
+    if (!deviceId) {
+      deviceId = 'usr_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+      localStorage.setItem('bc_device_id', deviceId);
+    }
+    // Also save in cookie for cross-context
+    document.cookie = `bc_device_id=${deviceId}; path=/; max-age=86400`;
+
+    const sendHeartbeat = () => {
+      fetch('/api/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: deviceId })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data) {
+          this.updateLobbyLiveStats(data.activeUsers, data.gamesPlayed);
+        }
+      })
+      .catch(() => {});
+    };
+
+    sendHeartbeat();
+    setInterval(sendHeartbeat, 12000);
+  }
+
+  updateLobbyLiveStats(activeUsers, gamesPlayed) {
+    const userEl = document.getElementById('activeUsersCount');
+    if (userEl) userEl.innerText = `${activeUsers} Pemain Aktif`;
+    const gameEl = document.getElementById('gamesPlayedCount');
+    if (gameEl) gameEl.innerText = `${gamesPlayed} Game Selesai`;
+  }
+
   // ========================================================
   // SESSION PERSISTENCE & AUTO-RECONNECT ON ACCIDENTAL REFRESH
   // ========================================================
+  saveLastPosition(x, y, levelIndex) {
+    try {
+      sessionStorage.setItem('bc_player_pos', JSON.stringify({
+        x: Math.round(x),
+        y: Math.round(y),
+        levelIndex: levelIndex,
+        roomCode: this.roomCode
+      }));
+    } catch(e) {}
+  }
+
+  getLastSavedPosition() {
+    try {
+      const raw = sessionStorage.getItem('bc_player_pos');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && (parsed.roomCode === this.roomCode || !this.roomCode) && typeof parsed.x === 'number') {
+        return parsed;
+      }
+    } catch(e) {}
+    return null;
+  }
+
   saveSession(levelIndex = 0) {
     try {
       const sessionData = {
@@ -104,10 +166,12 @@ class NetworkManager {
       this.slot = session.slot;
       this.isPublic = !!session.isPublic;
 
+      const savedPos = this.getLastSavedPosition();
+
       if (this.isHost) {
-        this.resumeAsHost(targetRoom, this.username, session.levelIndex || 0);
+        this.resumeAsHost(targetRoom, this.username, session.levelIndex || 0, savedPos);
       } else {
-        this.joinRoom(targetRoom, this.username, true, session.levelIndex || 0);
+        this.joinRoom(targetRoom, this.username, true, session.levelIndex || 0, savedPos);
       }
       return true;
     }
@@ -127,20 +191,20 @@ class NetworkManager {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     this.roomCode = code;
 
-    this.startHostPeer(`bc2d-${code}`, 0);
+    this.startHostPeer(`bc2d-${code}`, 0, null);
   }
 
-  resumeAsHost(roomCode, username, levelIdx = 0) {
+  resumeAsHost(roomCode, username, levelIdx = 0, restorePos = null) {
     this.username = username || 'Bobi';
     this.isHost = true;
     this.roomCode = roomCode;
     this.slot = 1;
 
-    console.log('[Network] Re-hosting room after refresh:', roomCode);
-    this.startHostPeer(`bc2d-${roomCode}`, levelIdx);
+    console.log('[Network] Re-hosting room after refresh at last position:', roomCode, restorePos);
+    this.startHostPeer(`bc2d-${roomCode}`, levelIdx, restorePos);
   }
 
-  startHostPeer(peerId, startLevelIdx = 0) {
+  startHostPeer(peerId, startLevelIdx = 0, restorePos = null) {
     if (this.peer) this.peer.destroy();
 
     this.updateConnectionBadge('connecting');
@@ -159,7 +223,7 @@ class NetworkManager {
       this.updateConnectionBadge('connected');
       this.onRoomReady(this.roomCode, 1, [
         { slot: 1, name: this.username }
-      ], startLevelIdx);
+      ], startLevelIdx, Date.now(), restorePos);
       this.saveSession(startLevelIdx);
     });
 
@@ -176,7 +240,10 @@ class NetworkManager {
           slot: 2,
           hostName: this.username,
           levelIndex: levelIdx,
-          levelStartTime: levelStart
+          levelStartTime: levelStart,
+          hostX: this.game ? this.game.myPlayer.x : null,
+          hostY: this.game ? this.game.myPlayer.y : null,
+          keys: this.game ? this.game.collectedKeys : []
         });
       });
     });
@@ -197,7 +264,7 @@ class NetworkManager {
   // ========================================================
   // JOIN ROOM (PRIVATE OR PUBLIC)
   // ========================================================
-  joinRoom(code, username, isResume = false, initialLevelIdx = 0) {
+  joinRoom(code, username, isResume = false, initialLevelIdx = 0, restorePos = null) {
     const cleanCode = (code || '').toString().trim();
     if (!cleanCode) {
       alert('Masukkan Kode Room yang valid!');
@@ -232,17 +299,23 @@ class NetworkManager {
       this.conn.on('open', () => {
         console.log('[Network] Connected to host!');
         this.updateConnectionBadge('connected');
+        
+        const myX = restorePos ? restorePos.x : (this.game ? this.game.myPlayer.x : null);
+        const myY = restorePos ? restorePos.y : (this.game ? this.game.myPlayer.y : null);
+
         this.send({
           type: 'join-request',
-          name: this.username
+          name: this.username,
+          joinerX: myX,
+          joinerY: myY
         });
 
-        // If resuming on refresh, ready immediately
+        // If resuming on refresh, ready immediately at last position
         if (isResume) {
           this.onRoomReady(this.roomCode, 2, [
             { slot: 1, name: 'Bobi' },
             { slot: 2, name: this.username }
-          ], initialLevelIdx);
+          ], initialLevelIdx, Date.now(), restorePos);
         }
         this.saveSession(initialLevelIdx);
       });
@@ -550,16 +623,32 @@ class NetworkManager {
     switch(data.type) {
       case 'init-sync':
         this.slot = data.slot;
+        const mySavedPos = this.getLastSavedPosition();
+        if (mySavedPos && data.hostX) {
+          mySavedPos.peerX = data.hostX;
+          mySavedPos.peerY = data.hostY;
+        }
+
         this.onRoomReady(this.roomCode, this.slot, [
           { slot: 1, name: data.hostName },
           { slot: 2, name: this.username }
-        ], data.levelIndex, data.levelStartTime);
+        ], data.levelIndex, data.levelStartTime, mySavedPos);
 
         this.saveSession(data.levelIndex);
 
         if (this.game) {
           this.game.peerPlayer.connected = true;
           this.game.peerPlayer.name = data.hostName;
+          if (typeof data.hostX === 'number') {
+            this.game.peerPlayer.x = data.hostX;
+            this.game.peerPlayer.y = data.hostY;
+            this.game.peerPlayer.targetX = data.hostX;
+            this.game.peerPlayer.targetY = data.hostY;
+          }
+          if (data.keys && Array.isArray(data.keys)) {
+            this.game.collectedKeys = data.keys;
+            this.game.updateKeyUI();
+          }
           this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, `${data.hostName} Siap!`, '#00ffcc', 20);
         }
         break;
@@ -568,17 +657,26 @@ class NetworkManager {
         if (this.game) {
           this.game.peerPlayer.connected = true;
           this.game.peerPlayer.name = data.name;
+          if (typeof data.joinerX === 'number' && typeof data.joinerY === 'number') {
+            this.game.peerPlayer.x = data.joinerX;
+            this.game.peerPlayer.y = data.joinerY;
+            this.game.peerPlayer.targetX = data.joinerX;
+            this.game.peerPlayer.targetY = data.joinerY;
+          }
           this.updateRoomBadgeCount(2);
           this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, `${data.name} Bergabung!`, '#00ffcc', 20);
           window.audioManager && window.audioManager.playKey();
 
-          // Sync current level index to newly joined player
+          // Sync current level index, host coordinates, and keys to newly joined partner
           this.send({
             type: 'init-sync',
             slot: 2,
             hostName: this.username,
             levelIndex: this.game.currentLevelIndex,
-            levelStartTime: this.game.levelStartTime
+            levelStartTime: this.game.levelStartTime,
+            hostX: this.game.myPlayer.x,
+            hostY: this.game.myPlayer.y,
+            keys: this.game.collectedKeys
           });
         }
         break;
@@ -704,7 +802,7 @@ class NetworkManager {
   // ========================================================
   // ROOM READY & GAME TRANSITION
   // ========================================================
-  onRoomReady(code, slot, players, levelIdx = 0, levelStart = Date.now()) {
+  onRoomReady(code, slot, players, levelIdx = 0, levelStart = Date.now(), restorePos = null) {
     this.roomCode = code;
     this.slot = slot;
 
@@ -729,17 +827,17 @@ class NetworkManager {
     // Save session so accidental refresh resumes in-game
     this.saveSession(levelIdx);
 
-    // Initialize or re-attach game instance
+    // Initialize or re-attach game instance with position restoration
     if (!this.game) {
       this.game = new window.GameEngine();
       this.game.setSlot(slot);
       this.game.myPlayer.name = this.username;
-      this.game.loadLevel(levelIdx, levelStart);
+      this.game.loadLevel(levelIdx, levelStart, restorePos);
       this.game.start();
     } else {
       this.game.setSlot(slot);
       this.game.myPlayer.name = this.username;
-      this.game.loadLevel(levelIdx, levelStart);
+      this.game.loadLevel(levelIdx, levelStart, restorePos);
     }
 
     this.updateRoomBadgeCount(players.length);
@@ -903,6 +1001,9 @@ class NetworkManager {
     });
 
     if (this.game && this.game.myPlayer.atDoor && this.game.peerPlayer.atDoor) {
+      // Record completed match to real-time stats
+      fetch('/api/game-played', { method: 'POST' }).catch(() => {});
+
       setTimeout(() => {
         const nextIdx = (this.game.currentLevelIndex + 1) % GAME_LEVELS.length;
         const nextStart = Date.now();
