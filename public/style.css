@@ -138,6 +138,25 @@ body, html {
   white-space: nowrap;
 }
 
+.hud-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.hud-btn:active {
+  transform: scale(0.96);
+}
+
+.btn-danger-hud {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+
+.btn-danger-hud:hover {
+  background: rgba(239, 68, 68, 0.45);
+  color: #ffffff;
+}
+
 .hud-btn:hover, .hud-btn:active {
   background: rgba(255, 255, 255, 0.25);
   transform: translateY(-1px);
@@ -623,6 +642,133 @@ body, html {
 
 .hidden {
   display: none !important;
+}
+
+/* MATCHMAKING & TIMEOUT POPUP STYLES */
+.modal-title-sm {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.matchmaking-card {
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.matchmaking-radar {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 12px 0 16px 0;
+}
+
+.radar-circle {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid #00e5ff;
+  opacity: 0;
+  animation: radarWave 2.4s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+.circle-1 { width: 35px; height: 35px; animation-delay: 0s; }
+.circle-2 { width: 65px; height: 65px; animation-delay: 0.8s; }
+.circle-3 { width: 95px; height: 95px; animation-delay: 1.6s; }
+
+.radar-dot {
+  width: 14px;
+  height: 14px;
+  background: #00e5ff;
+  border-radius: 50%;
+  box-shadow: 0 0 15px #00e5ff;
+  z-index: 2;
+}
+
+@keyframes radarWave {
+  0% { transform: scale(0.3); opacity: 0.9; }
+  80% { transform: scale(1.1); opacity: 0.2; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+
+.matchmaking-status {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-bottom: 12px;
+}
+
+.matchmaking-countdown {
+  font-size: 2.2rem;
+  font-weight: 800;
+  font-family: var(--font-hud);
+  color: #00e5ff;
+  text-shadow: 0 0 15px rgba(0, 229, 255, 0.5);
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+
+.matchmaking-note {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-bottom: 16px;
+  max-width: 280px;
+}
+
+.btn-cancel, .btn-ghost {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-family: var(--font-main);
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel:hover, .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+/* TIMEOUT POPUP CARD */
+.timeout-card {
+  max-width: 400px;
+  border-color: rgba(245, 158, 11, 0.35);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.8), 0 0 30px rgba(245, 158, 11, 0.2);
+}
+
+.timeout-icon-wrap {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 12px auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(245, 158, 11, 0.12);
+  border: 2px solid rgba(245, 158, 11, 0.3);
+  border-radius: 50%;
+}
+
+.timeout-desc {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #e2e8f0;
+  margin-bottom: 18px;
+  padding: 0 10px;
+}
+
+.timeout-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* MOBILE ADAPTATION FOR SMALL SCREENS */

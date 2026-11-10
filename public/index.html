@@ -27,9 +27,10 @@
 
       <div class="hud-right">
         <button id="btnFullscreen" class="hud-btn" title="Layar Penuh">Layar Penuh</button>
-        <button id="btnCopyLink" class="hud-btn" title="Salin Link">Bagikan Link</button>
+        <button id="btnCopyLink" class="hud-btn" title="Salin Link">Bagikan</button>
         <button id="btnRestart" class="hud-btn" title="Ulangi Level">Ulang</button>
         <button id="btnMute" class="hud-btn" title="Suara">Audio ON</button>
+        <button id="btnExitRoom" class="hud-btn btn-danger-hud" title="Keluar ke Menu">Keluar</button>
       </div>
     </header>
 
@@ -144,6 +145,51 @@
     </div>
   </div>
 
+  <!-- MATCHMAKING SEARCH MODAL (PUBLIC QUEUE) -->
+  <div id="matchmakingModal" class="modal-overlay hidden">
+    <div class="modal-card matchmaking-card">
+      <div class="matchmaking-radar">
+        <div class="radar-circle circle-1"></div>
+        <div class="radar-circle circle-2"></div>
+        <div class="radar-circle circle-3"></div>
+        <div class="radar-dot"></div>
+      </div>
+      <h2 class="modal-title-sm">Mencari Lawan Publik</h2>
+      <p id="matchmakingStatusText" class="matchmaking-status">Menghubungkan ke server antrean publik...</p>
+      <div id="matchmakingTimer" class="matchmaking-countdown">01:00</div>
+      <p class="matchmaking-note">Waktu pencarian maksimal 1 menit jika server sedang sepi</p>
+      <button id="btnCancelMatchmaking" class="btn-cancel">Batal</button>
+    </div>
+  </div>
+
+  <!-- MATCHMAKING TIMEOUT MODAL (USER REQUESTED POPUP) -->
+  <div id="matchTimeoutModal" class="modal-overlay hidden">
+    <div class="modal-card timeout-card">
+      <div class="timeout-icon-wrap">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <h2 class="modal-title-sm">Belum Ada Pemain</h2>
+      <p class="timeout-desc">
+        Belum ada pemain yang menggunakan server public atau undang teman mu bermain.
+      </p>
+      <div class="timeout-actions">
+        <button id="btnTimeoutCreatePrivate" class="btn-secondary">
+          <span>Buat Room Baru (Kode 6 Angka)</span>
+        </button>
+        <button id="btnTimeoutRetry" class="btn-primary">
+          <span>Coba Cari Lagi</span>
+        </button>
+        <button id="btnTimeoutClose" class="btn-ghost">
+          <span>Kembali ke Beranda</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST NOTIFICATION -->
   <div id="toast" class="toast hidden">Link Berhasil Disalin!</div>
 
@@ -173,11 +219,44 @@
         return name;
       }
 
+      // Check if user was already playing and accidentally refreshed
+      const resumed = window.networkManager.tryAutoResume();
+      if (resumed) {
+        window.audioManager.init();
+        showToast('Menyambung kembali ke permainan...');
+      }
+
+      // Quick Match (Public Queue with 1-min timeout)
       document.getElementById('btnQuickMatch').addEventListener('click', () => {
         window.audioManager.init();
-        window.networkManager.findPublicRoom(getUsername());
+        window.networkManager.startPublicMatchmaking(getUsername());
       });
 
+      document.getElementById('btnCancelMatchmaking').addEventListener('click', () => {
+        window.networkManager.cancelMatchmaking();
+      });
+
+      // Timeout dialog actions
+      document.getElementById('btnTimeoutCreatePrivate').addEventListener('click', () => {
+        const timeoutModal = document.getElementById('matchTimeoutModal');
+        if (timeoutModal) timeoutModal.classList.add('hidden');
+        window.audioManager.init();
+        window.networkManager.createPrivateRoom(getUsername());
+      });
+
+      document.getElementById('btnTimeoutRetry').addEventListener('click', () => {
+        window.audioManager.init();
+        window.networkManager.startPublicMatchmaking(getUsername());
+      });
+
+      document.getElementById('btnTimeoutClose').addEventListener('click', () => {
+        const timeoutModal = document.getElementById('matchTimeoutModal');
+        if (timeoutModal) timeoutModal.classList.add('hidden');
+        const lobbyModal = document.getElementById('lobbyModal');
+        if (lobbyModal) lobbyModal.classList.remove('hidden');
+      });
+
+      // Private Room
       document.getElementById('btnCreatePrivate').addEventListener('click', () => {
         window.audioManager.init();
         window.networkManager.createPrivateRoom(getUsername());
@@ -187,6 +266,13 @@
         window.audioManager.init();
         const code = document.getElementById('roomCodeInput').value.trim();
         window.networkManager.joinRoom(code, getUsername());
+      });
+
+      // In-game Exit / Leave room
+      document.getElementById('btnExitRoom').addEventListener('click', () => {
+        if (confirm('Keluar dari Room dan kembali ke Beranda?')) {
+          window.networkManager.leaveRoom();
+        }
       });
 
       document.getElementById('btnCopyLink').addEventListener('click', () => {

@@ -1,12 +1,11 @@
-// Unified PeerJS (WebRTC P2P) + Socket.io Multiplayer Network Manager
-// Designed specifically for 100% Vercel compatibility (Zero server timeout, direct P2P phones!)
+// Unified PeerJS (WebRTC P2P) Multiplayer & Matchmaking Engine
+// Designed for 100% Vercel Serverless & Direct Phone-to-Phone WebRTC P2P
 
 class NetworkManager {
   constructor() {
-    this.mode = 'webrtc'; // 'webrtc' for Vercel/P2P, or 'socketio'
+    this.mode = 'webrtc';
     this.peer = null;
     this.conn = null;
-    this.socket = null;
 
     this.roomCode = null;
     this.slot = 1; // 1 (Bobi - Host), 2 (Bona - Joiner)
@@ -16,19 +15,26 @@ class NetworkManager {
     this.ping = 0;
     this.pingInterval = null;
     this.isHost = false;
+    this.isPublic = false;
+
+    // Matchmaking timer & state
+    this.matchmakingTimer = null;
+    this.matchmakingSecondsLeft = 60;
+    this.matchmakingProbePeer = null;
+
+    // Reconnection handling
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 6;
+    this.reconnectTimer = null;
 
     this.init();
   }
 
   init() {
-    // Check if PeerJS is available
     if (window.Peer) {
       console.log('[Network] WebRTC Engine Ready for Vercel');
       this.mode = 'webrtc';
       this.updateConnectionBadge('connected');
-    } else {
-      console.log('[Network] Fallback to Socket.io');
-      this.initSocket();
     }
 
     // Auto-fill room code from URL ?room=123456
@@ -41,20 +47,100 @@ class NetworkManager {
   }
 
   // ========================================================
-  // WEBRTC PEER-TO-PEER ENGINE (FOR VERCEL)
+  // SESSION PERSISTENCE & AUTO-RECONNECT ON ACCIDENTAL REFRESH
+  // ========================================================
+  saveSession(levelIndex = 0) {
+    try {
+      const sessionData = {
+        roomCode: this.roomCode,
+        isHost: this.isHost,
+        slot: this.slot,
+        username: this.username,
+        levelIndex: levelIndex,
+        isPublic: this.isPublic,
+        timestamp: Date.now()
+      };
+      sessionStorage.setItem('bc_session', JSON.stringify(sessionData));
+    } catch (e) {
+      console.warn('Failed to save session:', e);
+    }
+  }
+
+  clearSession() {
+    try {
+      sessionStorage.removeItem('bc_session');
+    } catch (e) {}
+  }
+
+  getSession() {
+    try {
+      const raw = sessionStorage.getItem('bc_session');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      // Valid if less than 6 hours old
+      if (Date.now() - parsed.timestamp < 6 * 3600 * 1000) {
+        return parsed;
+      }
+      this.clearSession();
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  tryAutoResume() {
+    const session = this.getSession();
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+
+    // If there is an active session and either matches URL room or has roomCode
+    if (session && session.roomCode) {
+      const targetRoom = (roomParam && roomParam === session.roomCode) ? roomParam : session.roomCode;
+      console.log('[Network] Resuming active session from refresh:', session);
+
+      this.username = session.username || 'Pemain';
+      this.roomCode = targetRoom;
+      this.isHost = session.isHost;
+      this.slot = session.slot;
+      this.isPublic = !!session.isPublic;
+
+      if (this.isHost) {
+        this.resumeAsHost(targetRoom, this.username, session.levelIndex || 0);
+      } else {
+        this.joinRoom(targetRoom, this.username, true, session.levelIndex || 0);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // ========================================================
+  // HOST CREATION & RECREATION
   // ========================================================
   createPrivateRoom(username) {
     this.username = username || 'Bobi';
     this.isHost = true;
+    this.isPublic = false;
     this.slot = 1;
 
-    // Generate 6-digit numeric room code
+    // Generate random 6-digit numeric room code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     this.roomCode = code;
 
-    const peerId = `bc2d-${code}`;
+    this.startHostPeer(`bc2d-${code}`, 0);
+  }
 
-    // Destroy existing peer if any
+  resumeAsHost(roomCode, username, levelIdx = 0) {
+    this.username = username || 'Bobi';
+    this.isHost = true;
+    this.roomCode = roomCode;
+    this.slot = 1;
+
+    console.log('[Network] Re-hosting room after refresh:', roomCode);
+    this.startHostPeer(`bc2d-${roomCode}`, levelIdx);
+  }
+
+  startHostPeer(peerId, startLevelIdx = 0) {
     if (this.peer) this.peer.destroy();
 
     this.updateConnectionBadge('connecting');
@@ -69,21 +155,21 @@ class NetworkManager {
     });
 
     this.peer.on('open', (id) => {
-      console.log('[Network] Host Peer created with ID:', id);
+      console.log('[Network] Host Peer active with ID:', id);
       this.updateConnectionBadge('connected');
       this.onRoomReady(this.roomCode, 1, [
         { slot: 1, name: this.username }
-      ]);
+      ], startLevelIdx);
+      this.saveSession(startLevelIdx);
     });
 
     this.peer.on('connection', (conn) => {
-      console.log('[Network] Incoming connection from partner');
+      console.log('[Network] Partner connected to host');
       this.conn = conn;
       this.setupDataConnection();
 
       conn.on('open', () => {
-        // Send initial room setup to partner
-        const levelIdx = this.game ? this.game.currentLevelIndex : 0;
+        const levelIdx = this.game ? this.game.currentLevelIndex : startLevelIdx;
         const levelStart = this.game ? this.game.levelStartTime : Date.now();
         this.send({
           type: 'init-sync',
@@ -96,20 +182,25 @@ class NetworkManager {
     });
 
     this.peer.on('error', (err) => {
-      console.warn('Peer error:', err);
+      console.warn('Host Peer error:', err);
       if (err.type === 'unavailable-id') {
-        // Retry with another code
-        this.createPrivateRoom(username);
+        if (!this.isPublic) {
+          // If collision on private code, create a new random one
+          this.createPrivateRoom(this.username);
+        }
       } else {
         this.updateConnectionBadge('disconnected');
       }
     });
   }
 
-  joinRoom(code, username) {
+  // ========================================================
+  // JOIN ROOM (PRIVATE OR PUBLIC)
+  // ========================================================
+  joinRoom(code, username, isResume = false, initialLevelIdx = 0) {
     const cleanCode = (code || '').toString().trim();
-    if (!cleanCode || cleanCode.length !== 6 || !/^\d{6}$/.test(cleanCode)) {
-      alert('Masukkan 6 Digit Angka Kode Room yang valid!');
+    if (!cleanCode) {
+      alert('Masukkan Kode Room yang valid!');
       return;
     }
 
@@ -118,7 +209,7 @@ class NetworkManager {
     this.slot = 2;
     this.roomCode = cleanCode;
 
-    const targetPeerId = `bc2d-${cleanCode}`;
+    const targetPeerId = cleanCode.startsWith('bc2d-') ? cleanCode : `bc2d-${cleanCode}`;
 
     if (this.peer) this.peer.destroy();
 
@@ -134,32 +225,266 @@ class NetworkManager {
     });
 
     this.peer.on('open', () => {
-      console.log('Connecting to host:', targetPeerId);
+      console.log('[Network] Client Peer connected to STUN. Now reaching host:', targetPeerId);
       this.conn = this.peer.connect(targetPeerId, { reliable: true });
       this.setupDataConnection();
 
       this.conn.on('open', () => {
-        console.log('[Network] Connected to host');
+        console.log('[Network] Connected to host!');
         this.updateConnectionBadge('connected');
         this.send({
           type: 'join-request',
           name: this.username
         });
+
+        // If resuming on refresh, ready immediately
+        if (isResume) {
+          this.onRoomReady(this.roomCode, 2, [
+            { slot: 1, name: 'Bobi' },
+            { slot: 2, name: this.username }
+          ], initialLevelIdx);
+        }
+        this.saveSession(initialLevelIdx);
       });
     });
 
     this.peer.on('error', (err) => {
       console.warn('Peer join error:', err);
-      alert('Tidak dapat menemukan Room ' + cleanCode + '. Pastikan Room sudah dibuat oleh temanmu!');
+      if (!isResume) {
+        alert('Tidak dapat menemukan Room ' + cleanCode + '. Pastikan Room sudah dibuat dan aktif!');
+      }
       this.updateConnectionBadge('disconnected');
     });
   }
 
-  // Quick Match: scans public rooms or creates one
-  findPublicRoom(username) {
-    this.createPrivateRoom(username);
+  // ========================================================
+  // PUBLIC MATCHMAKING SYSTEM (60-SECOND QUEUE WITH TIMEOUT MODAL)
+  // ========================================================
+  startPublicMatchmaking(username) {
+    this.username = username || 'Pemain ' + Math.floor(10 + Math.random() * 89);
+    this.isPublic = true;
+
+    // Reset UI & open Matchmaking Modal
+    const lobbyModal = document.getElementById('lobbyModal');
+    if (lobbyModal) lobbyModal.classList.add('hidden');
+
+    const timeoutModal = document.getElementById('matchTimeoutModal');
+    if (timeoutModal) timeoutModal.classList.add('hidden');
+
+    const mmModal = document.getElementById('matchmakingModal');
+    if (mmModal) mmModal.classList.remove('hidden');
+
+    const statusText = document.getElementById('matchmakingStatusText');
+    if (statusText) statusText.innerText = 'Menghubungkan ke server antrean publik...';
+
+    // Start 60-second countdown
+    this.matchmakingSecondsLeft = 60;
+    this.updateMatchmakingTimerUI();
+
+    if (this.matchmakingTimer) clearInterval(this.matchmakingTimer);
+    this.matchmakingTimer = setInterval(() => {
+      this.matchmakingSecondsLeft--;
+      this.updateMatchmakingTimerUI();
+
+      if (this.matchmakingSecondsLeft <= 0) {
+        this.handleMatchmakingTimeout();
+      }
+    }, 1000);
+
+    // Step 1: Probe public lobby 'bc2d-pub-lobby-1' as a joiner
+    this.probePublicLobby();
   }
 
+  updateMatchmakingTimerUI() {
+    const timerEl = document.getElementById('matchmakingTimer');
+    if (timerEl) {
+      const sec = this.matchmakingSecondsLeft;
+      const formatted = sec < 10 ? `0${sec}` : `${sec}`;
+      timerEl.innerText = `00:${formatted}`;
+    }
+  }
+
+  probePublicLobby() {
+    const publicRoomId = 'bc2d-pub-lobby-1';
+    let hasConnected = false;
+
+    if (this.matchmakingProbePeer) {
+      this.matchmakingProbePeer.destroy();
+      this.matchmakingProbePeer = null;
+    }
+
+    const probe = new Peer({
+      debug: 1,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
+      }
+    });
+    this.matchmakingProbePeer = probe;
+
+    const probeTimeout = setTimeout(() => {
+      if (!hasConnected && this.matchmakingProbePeer === probe) {
+        console.log('[Matchmaking] No public host found. Becoming public host...');
+        probe.destroy();
+        this.hostPublicLobby(publicRoomId);
+      }
+    }, 2800);
+
+    probe.on('open', () => {
+      console.log('[Matchmaking] Probe peer ready. Trying to connect to existing public host:', publicRoomId);
+      const conn = probe.connect(publicRoomId, { reliable: true });
+
+      conn.on('open', () => {
+        hasConnected = true;
+        clearTimeout(probeTimeout);
+        console.log('[Matchmaking] Found active public host! Joining as Player 2...');
+
+        // Transition probe to active connection
+        this.stopMatchmakingTimer();
+        this.hideMatchmakingModal();
+
+        this.peer = probe;
+        this.conn = conn;
+        this.matchmakingProbePeer = null;
+
+        this.isHost = false;
+        this.slot = 2;
+        this.roomCode = 'Publik 1';
+
+        this.setupDataConnection();
+        this.send({
+          type: 'join-request',
+          name: this.username
+        });
+      });
+
+      conn.on('error', () => {
+        if (!hasConnected) {
+          clearTimeout(probeTimeout);
+          probe.destroy();
+          this.hostPublicLobby(publicRoomId);
+        }
+      });
+    });
+
+    probe.on('error', () => {
+      if (!hasConnected) {
+        clearTimeout(probeTimeout);
+        probe.destroy();
+        this.hostPublicLobby(publicRoomId);
+      }
+    });
+  }
+
+  hostPublicLobby(publicRoomId) {
+    if (this.matchmakingSecondsLeft <= 0) return;
+
+    const statusText = document.getElementById('matchmakingStatusText');
+    if (statusText) statusText.innerText = 'Menunggu pemain publik lain bergabung...';
+
+    if (this.peer) this.peer.destroy();
+
+    this.peer = new Peer(publicRoomId, {
+      debug: 1,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
+      }
+    });
+
+    this.peer.on('open', () => {
+      console.log('[Matchmaking] Public host established on', publicRoomId);
+      this.isHost = true;
+      this.slot = 1;
+      this.roomCode = 'Publik 1';
+    });
+
+    this.peer.on('connection', (conn) => {
+      console.log('[Matchmaking] Player 2 joined public lobby!');
+      this.stopMatchmakingTimer();
+      this.hideMatchmakingModal();
+
+      this.conn = conn;
+      this.setupDataConnection();
+
+      conn.on('open', () => {
+        this.onRoomReady(this.roomCode, 1, [
+          { slot: 1, name: this.username }
+        ], 0);
+
+        this.send({
+          type: 'init-sync',
+          slot: 2,
+          hostName: this.username,
+          levelIndex: 0,
+          levelStartTime: Date.now()
+        });
+      });
+    });
+
+    this.peer.on('error', (err) => {
+      console.warn('[Matchmaking] Public host peer error:', err);
+      if (err.type === 'unavailable-id') {
+        // Someone occupied pub-lobby-1 just now; retry probe
+        setTimeout(() => {
+          if (this.matchmakingSecondsLeft > 2) this.probePublicLobby();
+        }, 1000);
+      }
+    });
+  }
+
+  handleMatchmakingTimeout() {
+    console.log('[Matchmaking] 60-second timeout reached. No players found.');
+    this.stopMatchmakingTimer();
+    this.cancelMatchmakingPeers();
+    this.hideMatchmakingModal();
+
+    // Show User-Requested Timeout Modal
+    const timeoutModal = document.getElementById('matchTimeoutModal');
+    if (timeoutModal) timeoutModal.classList.remove('hidden');
+  }
+
+  stopMatchmakingTimer() {
+    if (this.matchmakingTimer) {
+      clearInterval(this.matchmakingTimer);
+      this.matchmakingTimer = null;
+    }
+  }
+
+  cancelMatchmakingPeers() {
+    if (this.matchmakingProbePeer) {
+      this.matchmakingProbePeer.destroy();
+      this.matchmakingProbePeer = null;
+    }
+    if (this.isPublic && this.isHost && (!this.conn || !this.conn.open)) {
+      if (this.peer) {
+        this.peer.destroy();
+        this.peer = null;
+      }
+    }
+  }
+
+  cancelMatchmaking() {
+    this.stopMatchmakingTimer();
+    this.cancelMatchmakingPeers();
+    this.hideMatchmakingModal();
+
+    const lobbyModal = document.getElementById('lobbyModal');
+    if (lobbyModal) lobbyModal.classList.remove('hidden');
+  }
+
+  hideMatchmakingModal() {
+    const mmModal = document.getElementById('matchmakingModal');
+    if (mmModal) mmModal.classList.add('hidden');
+  }
+
+  // ========================================================
+  // DATA CONNECTION & MESSAGING
+  // ========================================================
   setupDataConnection() {
     if (!this.conn) return;
 
@@ -168,19 +493,47 @@ class NetworkManager {
     });
 
     this.conn.on('close', () => {
-      console.log('Partner disconnected');
+      console.log('[Network] Partner disconnected');
       if (this.game) {
         this.game.peerPlayer.connected = false;
         this.updateRoomBadgeCount(1);
         this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, "Partner Terputus!", '#ff9100', 20);
+
+        // Client auto-reconnect attempt if unexpected drop
+        if (!this.isHost && this.roomCode && this.reconnectAttempts < this.maxReconnectAttempts) {
+          this.attemptClientReconnect();
+        }
       }
     });
 
     this.conn.on('error', (err) => {
-      console.error('Connection data error:', err);
+      console.error('[Network] Connection data error:', err);
     });
 
     this.startP2PPing();
+  }
+
+  attemptClientReconnect() {
+    this.reconnectAttempts++;
+    console.log(`[Network] Auto-reconnecting to host (Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+    
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(() => {
+      if (this.peer && this.roomCode) {
+        const targetPeerId = this.roomCode.startsWith('bc2d-') ? this.roomCode : `bc2d-${this.roomCode}`;
+        this.conn = this.peer.connect(targetPeerId, { reliable: true });
+        this.setupDataConnection();
+
+        this.conn.on('open', () => {
+          console.log('[Network] Reconnected to host successfully!');
+          this.reconnectAttempts = 0;
+          this.send({
+            type: 'join-request',
+            name: this.username
+          });
+        });
+      }
+    }, 2000);
   }
 
   send(data) {
@@ -201,6 +554,9 @@ class NetworkManager {
           { slot: 1, name: data.hostName },
           { slot: 2, name: this.username }
         ], data.levelIndex, data.levelStartTime);
+
+        this.saveSession(data.levelIndex);
+
         if (this.game) {
           this.game.peerPlayer.connected = true;
           this.game.peerPlayer.name = data.hostName;
@@ -215,6 +571,15 @@ class NetworkManager {
           this.updateRoomBadgeCount(2);
           this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, `${data.name} Bergabung!`, '#00ffcc', 20);
           window.audioManager && window.audioManager.playKey();
+
+          // Sync current level index to newly joined player
+          this.send({
+            type: 'init-sync',
+            slot: 2,
+            hostName: this.username,
+            levelIndex: this.game.currentLevelIndex,
+            levelStartTime: this.game.levelStartTime
+          });
         }
         break;
 
@@ -292,6 +657,7 @@ class NetworkManager {
         if (this.game) {
           window.audioManager && window.audioManager.playLevelComplete();
           this.game.loadLevel(data.levelIndex, data.levelStartTime);
+          this.saveSession(data.levelIndex);
         }
         break;
 
@@ -299,12 +665,6 @@ class NetworkManager {
         if (this.game) {
           this.game.loadLevel(this.game.currentLevelIndex, Date.now());
           this.game.addFloatingText(this.game.myPlayer.x, 200, "Level Direset!", '#ffd700', 22);
-        }
-        break;
-
-      case 'emote':
-        if (this.game) {
-          this.game.showEmote(data.slot, data.emote);
         }
         break;
 
@@ -327,23 +687,35 @@ class NetworkManager {
     }, 2000);
   }
 
+  // ========================================================
+  // ROOM READY & GAME TRANSITION
+  // ========================================================
   onRoomReady(code, slot, players, levelIdx = 0, levelStart = Date.now()) {
     this.roomCode = code;
     this.slot = slot;
 
-    // Hide lobby modal
+    // Hide all modals
     const lobbyModal = document.getElementById('lobbyModal');
     if (lobbyModal) lobbyModal.classList.add('hidden');
+
+    this.hideMatchmakingModal();
+    const timeoutModal = document.getElementById('matchTimeoutModal');
+    if (timeoutModal) timeoutModal.classList.add('hidden');
 
     // Show in-game HUD
     const hud = document.getElementById('gameHud');
     if (hud) hud.classList.remove('hidden');
 
     // Update URL query param for sharing
-    const newUrl = `${window.location.origin}${window.location.pathname}?room=${code}`;
-    window.history.replaceState({ path: newUrl }, '', newUrl);
+    if (!this.isPublic) {
+      const newUrl = `${window.location.origin}${window.location.pathname}?room=${code}`;
+      window.history.replaceState({ path: newUrl }, '', newUrl);
+    }
 
-    // Initialize game instance
+    // Save session so accidental refresh resumes in-game
+    this.saveSession(levelIdx);
+
+    // Initialize or re-attach game instance
     if (!this.game) {
       this.game = new window.GameEngine();
       this.game.setSlot(slot);
@@ -361,6 +733,42 @@ class NetworkManager {
 
     // Start background music
     window.audioManager && window.audioManager.startBGM();
+  }
+
+  // ========================================================
+  // LEAVE ROOM / RETURN TO LOBBY
+  // ========================================================
+  leaveRoom() {
+    this.clearSession();
+
+    // Reset URL to clean base
+    const cleanUrl = `${window.location.origin}${window.location.pathname}`;
+    window.history.replaceState({}, '', cleanUrl);
+
+    if (this.pingInterval) clearInterval(this.pingInterval);
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+
+    if (this.conn) {
+      try { this.conn.close(); } catch(e) {}
+      this.conn = null;
+    }
+    if (this.peer) {
+      try { this.peer.destroy(); } catch(e) {}
+      this.peer = null;
+    }
+
+    this.roomCode = null;
+    this.isHost = false;
+    this.isPublic = false;
+
+    // Hide HUD, show Lobby
+    const hud = document.getElementById('gameHud');
+    if (hud) hud.classList.add('hidden');
+
+    const lobbyModal = document.getElementById('lobbyModal');
+    if (lobbyModal) lobbyModal.classList.remove('hidden');
+
+    this.updateConnectionBadge('connected');
   }
 
   updateRoomBadgeCount(count) {
@@ -402,15 +810,9 @@ class NetworkManager {
     }
   }
 
-  // Socket.io fallback (optional)
-  initSocket() {
-    if (!window.io) return;
-    try {
-      this.socket = io({ timeout: 5000 });
-    } catch(e) {}
-  }
-
-  // Game actions emitted to partner
+  // ========================================================
+  // IN-GAME BROADCASTS
+  // ========================================================
   emitPlayerUpdate(data) {
     this.send({
       type: 'player-update',
@@ -431,7 +833,6 @@ class NetworkManager {
     };
 
     if (this.game) {
-      // Limit to 4 blocks per player
       const myBlocks = this.game.blocks.filter(b => b.playerSlot === playerSlot);
       if (myBlocks.length >= 4) {
         const oldest = myBlocks[0];
@@ -487,12 +888,13 @@ class NetworkManager {
       atDoor
     });
 
-    // Check if both reached door
     if (this.game && this.game.myPlayer.atDoor && this.game.peerPlayer.atDoor) {
       setTimeout(() => {
         const nextIdx = (this.game.currentLevelIndex + 1) % GAME_LEVELS.length;
         const nextStart = Date.now();
         this.game.loadLevel(nextIdx, nextStart);
+        this.saveSession(nextIdx);
+
         this.send({
           type: 'next-level',
           levelIndex: nextIdx,
@@ -508,17 +910,6 @@ class NetworkManager {
     }
     this.send({
       type: 'restart-level'
-    });
-  }
-
-  sendEmote(emote) {
-    if (this.game) {
-      this.game.showEmote(this.slot, emote);
-    }
-    this.send({
-      type: 'emote',
-      slot: this.slot,
-      emote
     });
   }
 }

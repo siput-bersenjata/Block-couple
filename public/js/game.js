@@ -292,7 +292,19 @@ class GameEngine {
       return this.checkOverlap({ x: targetX, y: targetY, width: blockSize, height: blockSize }, plat);
     });
 
-    if (overlapsPlatform) return;
+    // Prevent placing inside moving platform travel path (so platforms never penetrate or collide with blocks)
+    const overlapsMovingPlatformTrack = (this.currentLevel.movingPlatforms || []).some(mp => {
+      const minX = Math.min(mp.startX, mp.endX) - 4;
+      const maxX = Math.max(mp.startX, mp.endX) + mp.width + 4;
+      const minY = Math.min(mp.startY, mp.endY) - 4;
+      const maxY = Math.max(mp.startY, mp.endY) + mp.height + 4;
+      return this.checkOverlap(
+        { x: targetX, y: targetY, width: blockSize, height: blockSize },
+        { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+      );
+    });
+
+    if (overlapsPlatform || overlapsMovingPlatformTrack) return;
 
     if (window.networkManager) {
       window.networkManager.emitCreateBlock({
