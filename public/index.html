@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Block Couple: Duo Quest - 2D Co-op Platformer</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
@@ -17,26 +16,26 @@
       <div class="hud-left">
         <span id="roomBadge" class="badge badge-purple">Room: ------</span>
         <span id="playerCountBadge" class="badge badge-yellow">1/2 Pemain</span>
-        <span id="pingBadge" class="badge badge-gray">📶 -- ms</span>
-        <span id="roleBadge" class="role-indicator">Kamu: Bobi</span>
+        <span id="pingBadge" class="badge badge-gray">Ping: -- ms</span>
+        <span id="roleBadge" class="role-indicator">Pemain: Bobi</span>
       </div>
 
       <div class="hud-center">
-        <div id="levelTitle" class="level-title">Level 1: Gerbang Awal & Monster Lendir</div>
-        <div id="keyTracker" class="key-tracker">🔑 0/2 Kunci</div>
+        <div id="levelTitle" class="level-title">Level 1: Gerbang Awal</div>
+        <div id="keyTracker" class="key-tracker">Kunci: 0/2</div>
       </div>
 
       <div class="hud-right">
-        <button id="btnFullscreen" class="hud-btn" title="Layar Penuh HP">⛶ Layar Penuh</button>
-        <button id="btnCopyLink" class="hud-btn" title="Salin Link Main Bareng">🔗 Bagikan</button>
-        <button id="btnRestart" class="hud-btn" title="Reset Level">🔄 Ulang</button>
-        <button id="btnMute" class="hud-btn" title="Mute Suara">🔊</button>
+        <button id="btnFullscreen" class="hud-btn" title="Layar Penuh">Layar Penuh</button>
+        <button id="btnCopyLink" class="hud-btn" title="Salin Link">Bagikan Link</button>
+        <button id="btnRestart" class="hud-btn" title="Ulangi Level">Ulang</button>
+        <button id="btnMute" class="hud-btn" title="Suara">Audio ON</button>
       </div>
     </header>
 
     <!-- HINT BANNER -->
     <div id="levelHint" class="hint-banner">
-      Gunakan tombol [📦 Buat Balok] untuk jembatan jurang, dan injak / kurung monster lendir!
+      Gunakan tombol [Buat Balok] untuk melewati jurang dan rintangan!
     </div>
 
     <!-- MAIN 2.5D GAME CANVAS WRAPPER -->
@@ -44,37 +43,31 @@
       <canvas id="gameCanvas" width="960" height="540"></canvas>
     </main>
 
-    <!-- FLOATING QUICK EMOTE BAR -->
-    <div id="emoteBar" class="emote-bar">
-      <button class="emote-btn" onclick="networkManager.sendEmote('💖')">💖</button>
-      <button class="emote-btn" onclick="networkManager.sendEmote('💡')">💡</button>
-      <button class="emote-btn" onclick="networkManager.sendEmote('⬆️')">⬆️</button>
-      <button class="emote-btn" onclick="networkManager.sendEmote('🎉')">🎉</button>
-      <button class="emote-btn" onclick="networkManager.sendEmote('😭')">😭</button>
-    </div>
-
-    <!-- MOBILE TOUCH CONTROLS (VIRTUAL D-PAD & ACTION BUTTONS) -->
+    <!-- MOBILE TOUCH CONTROLS (CLEAN LABELS, NO EMOJIS) -->
     <div id="touchControls" class="touch-controls">
       <!-- Left Hand: Movement -->
       <div class="touch-group touch-left">
-        <button id="btnLeft" class="touch-btn dpad-btn" aria-label="Kiri">◀</button>
-        <button id="btnDown" class="touch-btn dpad-btn" aria-label="Bawah / Tangga">▼</button>
-        <button id="btnRight" class="touch-btn dpad-btn" aria-label="Kanan">▶</button>
+        <button id="btnLeft" class="touch-btn dpad-btn" aria-label="Kiri">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <button id="btnDown" class="touch-btn dpad-btn" aria-label="Bawah / Tangga">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <button id="btnRight" class="touch-btn dpad-btn" aria-label="Kanan">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
       </div>
 
       <!-- Right Hand: Actions -->
       <div class="touch-group touch-right">
         <button id="btnClear" class="touch-btn action-btn btn-clear" aria-label="Hapus Balok">
-          🧹
-          <span>Hapus</span>
+          <span class="btn-main-label">HAPUS</span>
         </button>
         <button id="btnPlace" class="touch-btn action-btn btn-place" aria-label="Buat Balok">
-          📦
-          <span>Balok</span>
+          <span class="btn-main-label">BALOK</span>
         </button>
         <button id="btnJump" class="touch-btn action-btn btn-jump" aria-label="Lompat">
-          ⬆
-          <span>Lompat</span>
+          <span class="btn-main-label">LOMPAT</span>
         </button>
       </div>
     </div>
@@ -90,41 +83,39 @@
             <div class="eye right"></div>
             <div class="cap"></div>
           </div>
-          <span class="love-symbol">💖</span>
+          <div class="mascot-connector"></div>
           <div class="box-preview bona">
             <div class="eye left"></div>
             <div class="eye right"></div>
-            <div class="bow">🎀</div>
+            <div class="hair-bow"></div>
           </div>
         </div>
         <h1 class="game-title">BLOCK COUPLE</h1>
         <p class="game-tagline">Petualangan 2.5D Co-op 2 Pemain</p>
         <div class="connection-status-row">
-          <span id="connectionStatus" class="status-badge status-yellow">🟡 Menghubungkan ke Server...</span>
+          <span id="connectionStatus" class="status-badge status-green">Online (P2P Ready)</span>
         </div>
       </div>
 
       <!-- USERNAME CREATION SECTION -->
       <div class="username-section">
-        <label for="usernameInput" class="input-label">👤 Nama Karakter Kamu:</label>
+        <label for="usernameInput" class="input-label">Nama Karakter:</label>
         <div class="username-input-wrapper">
-          <input type="text" id="usernameInput" placeholder="Masukkan nama kamu..." maxlength="15" autocomplete="off" spellcheck="false">
+          <input type="text" id="usernameInput" placeholder="Ketik nama kamu..." maxlength="15" autocomplete="off" spellcheck="false">
         </div>
       </div>
 
       <div class="lobby-actions">
         <!-- Quick Match (Public) -->
         <button id="btnQuickMatch" class="btn-primary">
-          <span class="btn-icon">⚡</span>
-          <span>Cari Lawan / Room Publik</span>
+          <span>Cari Lawan (Publik)</span>
         </button>
 
         <div class="divider"><span>ATAU MAIN DENGAN TEMAN (KODE 6 ANGKA)</span></div>
 
         <!-- Create Private Room with 6 Digits -->
         <button id="btnCreatePrivate" class="btn-secondary">
-          <span class="btn-icon">➕</span>
-          <span>Buat Room Baru (Kode 6 Angka)</span>
+          <span>Buat Room Baru (6 Digit)</span>
         </button>
 
         <!-- Join with 6-Digit Code -->
@@ -137,16 +128,16 @@
       <!-- EXPANDABLE INSTRUCTIONS ACCORDION -->
       <details class="instructions-accordion">
         <summary class="instructions-summary">
-          <span>📖 Panduan Cara Bermain (Klik di sini)</span>
-          <span class="accordion-arrow">▼</span>
+          <span>Panduan Cara Bermain</span>
+          <span class="accordion-arrow">[+]</span>
         </summary>
         <div class="instructions-content">
           <ul>
-            <li>👫 <b>Bobi & Bona:</b> Bekerjasama melewati jurang, anak tangga tebing, & musuh!</li>
-            <li>📦 <b>Balok Ajaib:</b> Taruh balok untuk jembatan jurang, anak tangga tinggi, atau menimpa musuh.</li>
-            <li>👾 <b>Musuh & Rintangan:</b> Injak/timpa monster lendir, hindari drone terbang, dan gunakan pegas trampolin!</li>
-            <li>🔑 <b>Kunci & Pintu:</b> Ambil semua kunci emas, lalu <b>kedua pemain</b> harus bersama-sama masuk ke pintu!</li>
-            <li>🎮 <b>Kontrol PC:</b> Tombol A/D (Gerak), W/Spasi (Lompat), S (Bawah), E/X (Balok), C (Hapus).</li>
+            <li><b>Bobi & Bona:</b> Dua karakter kotak yang harus bekerjasama melewati rintangan.</li>
+            <li><b>Balok:</b> Buat balok untuk jembatan jurang, anak tangga tinggi, atau menahan tombol.</li>
+            <li><b>Rintangan:</b> Injak musuh dari atas untuk mengalahkannya, hindari drone, dan gunakan trampolin.</li>
+            <li><b>Kunci & Pintu:</b> Kumpulkan semua kunci level, lalu kedua pemain harus tiba di pintu bersamaan.</li>
+            <li><b>Kontrol PC:</b> Tombol A/D (Gerak), W/Spasi (Lompat), S (Bawah), E/X (Balok), C (Hapus).</li>
           </ul>
         </div>
       </details>
@@ -182,7 +173,6 @@
         return name;
       }
 
-      // Lobby button handlers
       document.getElementById('btnQuickMatch').addEventListener('click', () => {
         window.audioManager.init();
         window.networkManager.findPublicRoom(getUsername());
@@ -199,11 +189,10 @@
         window.networkManager.joinRoom(code, getUsername());
       });
 
-      // HUD button handlers
       document.getElementById('btnCopyLink').addEventListener('click', () => {
         const url = window.location.href;
         navigator.clipboard.writeText(url).then(() => {
-          showToast('Link room 6 angka berhasil disalin! Kirimkan ke WhatsApp teman.');
+          showToast('Link room berhasil disalin!');
         }).catch(() => {
           prompt('Salin link ini untuk temanmu:', url);
         });
@@ -211,11 +200,9 @@
 
       document.getElementById('btnFullscreen').addEventListener('click', () => {
         if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(err => {
-            console.log(err);
-          });
+          document.documentElement.requestFullscreen().catch(err => {});
         } else {
-          document.exitFullscreen().catch(err => console.log(err));
+          document.exitFullscreen().catch(err => {});
         }
       });
 
@@ -225,7 +212,7 @@
 
       document.getElementById('btnMute').addEventListener('click', (e) => {
         const isMuted = window.audioManager.toggleMute();
-        e.target.innerText = isMuted ? '🔇' : '🔊';
+        e.target.innerText = isMuted ? 'Audio OFF' : 'Audio ON';
       });
 
       function showToast(msg) {

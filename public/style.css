@@ -1,4 +1,4 @@
-/* Block Couple - Arcade 2.5D Mobile-First Responsive Styling */
+/* Block Couple - Arcade 2.5D Mobile-First Responsive Styling (Clean Modern UX, No Emojis) */
 
 :root {
   --color-bobi: #00e5ff;
@@ -7,7 +7,7 @@
   --color-bg-dark: #0a0e1a;
   --color-surface: rgba(26, 32, 53, 0.85);
   --color-surface-border: rgba(255, 255, 255, 0.15);
-  --font-main: 'Fredoka', cursive, sans-serif;
+  --font-main: 'Fredoka', sans-serif;
   --font-hud: 'Outfit', sans-serif;
 }
 
@@ -53,7 +53,7 @@ body, html {
   justify-content: space-between;
   align-items: center;
   padding: 6px 14px;
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(15, 23, 42, 0.88);
   backdrop-filter: blur(12px);
   border-bottom: 2px solid rgba(255, 255, 255, 0.12);
   z-index: 20;
@@ -70,7 +70,7 @@ body, html {
   font-size: 0.78rem;
   font-weight: 700;
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: 6px;
   letter-spacing: 0.5px;
   white-space: nowrap;
 }
@@ -120,7 +120,7 @@ body, html {
 .key-tracker {
   font-size: 0.8rem;
   color: var(--color-gold);
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -129,8 +129,8 @@ body, html {
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #fff;
   padding: 5px 10px;
-  border-radius: 8px;
-  font-size: 0.78rem;
+  border-radius: 6px;
+  font-size: 0.76rem;
   font-family: var(--font-hud);
   font-weight: 600;
   cursor: pointer;
@@ -178,36 +178,7 @@ body, html {
   border: 2px solid rgba(255, 255, 255, 0.15);
 }
 
-/* FLOATING QUICK EMOTE BAR */
-.emote-bar {
-  position: absolute;
-  top: 54px;
-  right: 12px;
-  display: flex;
-  gap: 5px;
-  z-index: 30;
-}
-
-.emote-btn {
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  font-size: 1.15rem;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-  transition: transform 0.15s;
-}
-
-.emote-btn:active {
-  transform: scale(1.3);
-}
-
-/* MOBILE TOUCH CONTROLS */
+/* MOBILE TOUCH CONTROLS (NO EMOJIS, CLEAN ARCHITECTURAL) */
 .touch-controls {
   position: absolute;
   bottom: max(12px, env(safe-area-inset-bottom, 12px));
@@ -235,7 +206,7 @@ body, html {
 }
 
 .touch-btn {
-  background: rgba(30, 41, 59, 0.75);
+  background: rgba(30, 41, 59, 0.78);
   backdrop-filter: blur(8px);
   border: 2px solid rgba(255, 255, 255, 0.25);
   color: #fff;
@@ -258,44 +229,44 @@ body, html {
 }
 
 .dpad-btn {
-  width: 54px;
-  height: 54px;
+  width: 52px;
+  height: 52px;
   font-size: 1.25rem;
 }
 
 .action-btn {
   width: 58px;
   height: 58px;
-  border-radius: 18px;
-  font-size: 1.2rem;
-  gap: 2px;
-}
-
-.action-btn span {
-  font-size: 0.62rem;
-  font-weight: 600;
+  border-radius: 16px;
+  font-size: 0.85rem;
   letter-spacing: 0.5px;
 }
 
+.btn-main-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+}
+
 .btn-jump {
-  background: rgba(0, 229, 255, 0.35);
+  background: rgba(0, 229, 255, 0.38);
   border-color: #00e5ff;
   width: 66px;
   height: 66px;
 }
 
 .btn-place {
-  background: rgba(255, 59, 119, 0.35);
+  background: rgba(255, 59, 119, 0.38);
   border-color: #ff3b77;
 }
 
 .btn-clear {
-  background: rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.32);
   border-color: #f59e0b;
 }
 
 /* ========================================================
-   LOBBY MODAL - PERFECT MOBILE FIT (NO CLIPPING BUG)
+   LOBBY MODAL - PERFECT MOBILE FIT (NO CLIPPING, NO EMOJIS)
    ======================================================== */
 .modal-overlay {
   position: fixed;
@@ -304,7 +275,7 @@ body, html {
   backdrop-filter: blur(12px);
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* CRITICAL: ensures top is NEVER clipped on mobile! */
+  align-items: flex-start; /* Ensures top is never clipped! */
   padding: max(12px, env(safe-area-inset-top, 12px)) 12px max(24px, env(safe-area-inset-bottom, 24px)) 12px;
   z-index: 100;
   overflow-y: auto;
@@ -312,13 +283,13 @@ body, html {
 }
 
 .modal-card {
-  margin: auto 0; /* Centers vertically if space permits, scrolls naturally if viewport is small! */
+  margin: auto 0; /* Centers vertically if space permits, scrolls naturally if small */
   width: 100%;
-  max-width: 420px;
+  max-width: 410px;
   background: #111827;
   border: 2px solid rgba(255, 255, 255, 0.12);
-  border-radius: 20px;
-  padding: 18px 18px 22px 18px;
+  border-radius: 18px;
+  padding: 16px 16px 20px 16px;
   box-shadow: 0 16px 45px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 229, 255, 0.2);
   text-align: center;
   animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -338,9 +309,9 @@ body, html {
 }
 
 .box-preview {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
   position: relative;
   box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
@@ -357,15 +328,15 @@ body, html {
 
 .box-preview .eye {
   position: absolute;
-  top: 11px;
-  width: 4px;
-  height: 7px;
+  top: 10px;
+  width: 3.5px;
+  height: 6px;
   background: #0f172a;
   border-radius: 2px;
 }
 
-.box-preview .eye.left { left: 9px; }
-.box-preview .eye.right { right: 9px; }
+.box-preview .eye.left { left: 8px; }
+.box-preview .eye.right { right: 8px; }
 
 .box-preview .cap {
   position: absolute;
@@ -374,30 +345,31 @@ body, html {
   right: 3px;
   height: 5px;
   background: #0059b3;
-  border-radius: 4px 4px 0 0;
+  border-radius: 3px 3px 0 0;
 }
 
-.box-preview .bow {
+/* Clean CSS ribbon hairpin (no emoji!) */
+.box-preview .hair-bow {
   position: absolute;
-  top: -11px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 15px;
+  top: -5px;
+  right: -2px;
+  width: 10px;
+  height: 7px;
+  background: #ffffff;
+  border-radius: 3px;
+  border: 1px solid #ff3b77;
 }
 
-.love-symbol {
-  font-size: 1.4rem;
-  animation: pulseHeart 1.2s infinite;
-}
-
-@keyframes pulseHeart {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.25); }
+.mascot-connector {
+  width: 16px;
+  height: 3px;
+  background: linear-gradient(90deg, #00e5ff, #ff3b77);
+  border-radius: 2px;
 }
 
 .game-title {
-  font-size: 1.7rem;
-  font-weight: 700;
+  font-size: 1.6rem;
+  font-weight: 800;
   letter-spacing: 0.5px;
   line-height: 1.15;
   background: linear-gradient(135deg, #00e5ff 0%, #ff3b77 100%);
@@ -407,21 +379,22 @@ body, html {
 }
 
 .game-tagline {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: #94a3b8;
   margin-bottom: 8px;
 }
 
 .connection-status-row {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .status-badge {
-  font-size: 0.74rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 700;
   padding: 3px 10px;
   border-radius: 999px;
   display: inline-block;
+  letter-spacing: 0.3px;
 }
 
 .status-green {
@@ -446,16 +419,16 @@ body, html {
 .username-section {
   background: rgba(30, 41, 59, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
   text-align: left;
 }
 
 .input-label {
   display: block;
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 700;
   color: #cbd5e1;
   margin-bottom: 4px;
 }
@@ -467,9 +440,9 @@ body, html {
   border-radius: 8px;
   color: #ffffff;
   font-family: var(--font-main);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 600;
-  padding: 8px 12px;
+  padding: 8px 10px;
   outline: none;
   transition: border-color 0.2s;
 }
@@ -482,22 +455,21 @@ body, html {
 .lobby-actions {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .btn-primary, .btn-secondary {
   width: 100%;
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-size: 0.92rem;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 0.9rem;
   font-family: var(--font-main);
   font-weight: 700;
   cursor: pointer;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
   border: none;
   transition: transform 0.15s, box-shadow 0.15s;
 }
@@ -505,13 +477,13 @@ body, html {
 .btn-primary {
   background: linear-gradient(135deg, #00e5ff 0%, #0088ff 100%);
   color: #05162b;
-  box-shadow: 0 5px 16px rgba(0, 229, 255, 0.35);
+  box-shadow: 0 4px 14px rgba(0, 229, 255, 0.3);
 }
 
 .btn-secondary {
   background: linear-gradient(135deg, #ff3b77 0%, #e0245e 100%);
   color: #ffffff;
-  box-shadow: 0 5px 16px rgba(255, 59, 119, 0.35);
+  box-shadow: 0 4px 14px rgba(255, 59, 119, 0.3);
 }
 
 .btn-primary:active, .btn-secondary:active {
@@ -522,9 +494,9 @@ body, html {
   display: flex;
   align-items: center;
   text-align: center;
-  margin: 4px 0;
+  margin: 3px 0;
   color: #64748b;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.5px;
 }
@@ -541,21 +513,21 @@ body, html {
 
 .join-code-group {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .join-code-group input {
   flex: 1;
   background: #1e293b;
   border: 2px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
+  border-radius: 8px;
   color: #ffffff;
   font-family: var(--font-hud);
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 700;
   text-align: center;
   letter-spacing: 3px;
-  padding: 10px;
+  padding: 9px;
   outline: none;
 }
 
@@ -567,11 +539,11 @@ body, html {
   background: #3b82f6;
   color: #fff;
   border: none;
-  border-radius: 10px;
-  padding: 0 18px;
+  border-radius: 8px;
+  padding: 0 16px;
   font-family: var(--font-main);
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   cursor: pointer;
 }
 
@@ -581,16 +553,16 @@ body, html {
 
 /* EXPANDABLE INSTRUCTIONS ACCORDION */
 .instructions-accordion {
-  background: rgba(30, 41, 59, 0.5);
+  background: rgba(30, 41, 59, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
   text-align: left;
 }
 
 .instructions-summary {
-  padding: 9px 12px;
-  font-size: 0.8rem;
+  padding: 8px 12px;
+  font-size: 0.78rem;
   font-weight: 700;
   color: #cbd5e1;
   cursor: pointer;
@@ -605,28 +577,24 @@ body, html {
   display: none;
 }
 
-.instructions-accordion[open] .accordion-arrow {
-  transform: rotate(180deg);
-}
-
 .accordion-arrow {
-  font-size: 0.65rem;
-  transition: transform 0.2s;
+  font-size: 0.72rem;
   color: #94a3b8;
+  font-family: monospace;
 }
 
 .instructions-content {
-  padding: 10px 14px 12px 14px;
+  padding: 8px 12px 10px 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .instructions-content ul {
   list-style: none;
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   color: #94a3b8;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
 }
 
 /* TOAST NOTIFICATION */
@@ -638,9 +606,9 @@ body, html {
   background: #10b981;
   color: #ffffff;
   padding: 8px 18px;
-  border-radius: 20px;
-  font-size: 0.88rem;
-  font-weight: 600;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
   box-shadow: 0 6px 20px rgba(0,0,0,0.5);
   opacity: 0;
   transition: all 0.3s ease;
@@ -660,42 +628,43 @@ body, html {
 /* MOBILE ADAPTATION FOR SMALL SCREENS */
 @media (max-width: 600px) {
   .hud-bar {
-    padding: 4px 8px;
+    padding: 4px 6px;
     gap: 4px;
   }
   .badge {
-    font-size: 0.72rem;
-    padding: 3px 6px;
+    font-size: 0.7rem;
+    padding: 2px 5px;
   }
   .role-indicator {
-    font-size: 0.74rem;
-  }
-  .level-title {
-    font-size: 0.85rem;
-  }
-  .key-tracker {
     font-size: 0.72rem;
   }
+  .level-title {
+    font-size: 0.8rem;
+  }
+  .key-tracker {
+    font-size: 0.7rem;
+  }
   .hud-btn {
-    padding: 4px 7px;
-    font-size: 0.74rem;
+    padding: 3px 6px;
+    font-size: 0.72rem;
   }
   .dpad-btn {
-    width: 50px;
-    height: 50px;
-    font-size: 1.15rem;
+    width: 48px;
+    height: 48px;
   }
   .action-btn {
     width: 52px;
     height: 52px;
-    font-size: 1.1rem;
   }
   .btn-jump {
     width: 60px;
     height: 60px;
   }
+  .btn-main-label {
+    font-size: 0.65rem;
+  }
   .touch-controls {
-    bottom: max(8px, env(safe-area-inset-bottom, 8px));
-    padding: 0 8px;
+    bottom: max(6px, env(safe-area-inset-bottom, 6px));
+    padding: 0 6px;
   }
 }

@@ -8,7 +8,7 @@ const GAME_LEVELS = [
   {
     id: 1,
     title: "Level 1: Gerbang Awal & Monster Lendir",
-    hint: "Gunakan [📦 Balok] untuk jembatan jurang, dan hindari / kurung monster lendir!",
+    hint: "Gunakan tombol [Buat Balok] untuk jembatan jurang, dan hindari / kurung monster lendir!",
     width: 1500,
     height: 540,
     spawns: {

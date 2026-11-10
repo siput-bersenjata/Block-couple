@@ -644,7 +644,7 @@ class GameEngine {
     const en = this.currentLevel.enemies.find(e => e.id === enemyId);
     if (en) {
       this.createSpawnSparks(en.x + en.width / 2, en.y + en.height / 2, '#ff007f');
-      this.addFloatingText(en.x, en.y - 20, "K.O! ⭐", '#ffd700', 18);
+      this.addFloatingText(en.x, en.y - 20, "K.O!", '#ffd700', 18);
     }
 
     if (window.networkManager) {
@@ -796,7 +796,7 @@ class GameEngine {
         this.collectedKeys.push(key.id);
         window.audioManager && window.audioManager.playKey();
         this.createSpawnSparks(key.x, key.y, '#ffd700');
-        this.addFloatingText(key.x, key.y - 25, "KUNCI DIAMBIL! 🔑", '#ffd700', 16);
+        this.addFloatingText(key.x, key.y - 25, "KUNCI DIAMBIL!", '#ffd700', 16);
         this.updateKeyUI();
 
         if (window.networkManager) {
@@ -805,7 +805,7 @@ class GameEngine {
 
         if (this.collectedKeys.length === this.currentLevel.keys.length) {
           window.audioManager && window.audioManager.playDoorOpen();
-          this.addFloatingText(this.myPlayer.x, this.myPlayer.y - 45, "PINTU TERBUKA! PERGI KE PINTU! 🚪✨", '#00ffcc', 20);
+          this.addFloatingText(this.myPlayer.x, this.myPlayer.y - 45, "PINTU TERBUKA! MENUJU PINTU!", '#00ffcc', 20);
         }
       }
     }
@@ -836,7 +836,7 @@ class GameEngine {
     if (!keyContainer) return;
     const total = this.currentLevel.keys.length;
     const collected = this.collectedKeys.length;
-    keyContainer.innerHTML = `🔑 <b>${collected} / ${total}</b> Kunci`;
+    keyContainer.innerHTML = `Kunci: <b>${collected} / ${total}</b>`;
   }
 
   updateCoupleLoveHearts() {
@@ -849,12 +849,13 @@ class GameEngine {
       const midX = (this.myPlayer.x + this.peerPlayer.x) / 2 + 16;
       const midY = (this.myPlayer.y + this.peerPlayer.y) / 2;
       this.particles.push({
-        type: 'heart',
+        type: 'spark',
         x: midX + (Math.random() * 20 - 10),
         y: midY,
         vx: (Math.random() - 0.5) * 0.8,
         vy: -1.3 - Math.random() * 0.8,
-        scale: 0.8 + Math.random() * 0.5,
+        color: '#ff3b77',
+        radius: 3.5,
         alpha: 1,
         life: 1
       });
@@ -1329,16 +1330,27 @@ class GameEngine {
       ctx.fillStyle = portalGrad;
       ctx.fillRect(d.x, d.y, d.width, d.height);
 
-      ctx.font = '22px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('💖', d.x + d.width / 2, d.y + d.height / 2 + 8);
+      // Glowing geometric core
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(d.x + d.width / 2, d.y + d.height / 2, 8, 0, Math.PI * 2);
+      ctx.fill();
     } else {
       ctx.fillStyle = '#334155';
       ctx.fillRect(d.x, d.y, d.width, d.height);
 
-      ctx.font = '20px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('🔒', d.x + d.width / 2, d.y + d.height / 2 + 8);
+      // Crisp geometric padlock
+      const cx = d.x + d.width / 2;
+      const cy = d.y + d.height / 2;
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy - 4, 6, Math.PI, 0);
+      ctx.stroke();
+
+      ctx.fillStyle = '#cbd5e1';
+      this.drawRoundedRect(ctx, cx - 8, cy - 2, 16, 12, 2);
+      ctx.fill();
     }
 
     const playersAtDoorCount = (this.myPlayer.atDoor ? 1 : 0) + (this.peerPlayer.atDoor ? 1 : 0);
@@ -1395,11 +1407,25 @@ class GameEngine {
       this.drawRoundedRect(ctx, b.x + 3, b.y + 3, b.width - 6, 8, 3);
       ctx.fill();
 
-      // Cute pattern
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-      ctx.font = '14px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(b.playerSlot === 1 ? '❄️' : '🌸', b.x + b.width / 2, b.y + b.height / 2 + 5);
+      // Geometric block pattern (clean, no emojis)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      const bx = b.x + b.width / 2;
+      const by = b.y + b.height / 2;
+      if (b.playerSlot === 1) {
+        ctx.beginPath();
+        ctx.moveTo(bx, by - 6);
+        ctx.lineTo(bx + 6, by);
+        ctx.lineTo(bx, by + 6);
+        ctx.lineTo(bx - 6, by);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.beginPath();
+        ctx.arc(bx, by, 5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
 
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1.5;
@@ -1511,10 +1537,14 @@ class GameEngine {
       ctx.fillStyle = '#003d80';
       ctx.fillRect(p.facing > 0 ? -2 : -halfW - 6, -halfH - 2, halfW + 6, 3);
     } else {
-      // Bona's Bow Ribbon
-      ctx.font = '16px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('🎀', 0, -halfH - 2);
+      // Bona's geometric hairpin
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#ff3b77';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(4, -halfH - 2, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     }
 
     // Name tag
@@ -1546,11 +1576,7 @@ class GameEngine {
     for (const p of this.particles) {
       ctx.save();
       ctx.globalAlpha = p.alpha;
-      if (p.type === 'heart') {
-        ctx.font = `${Math.floor(18 * p.scale)}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.fillText('💖', p.x, p.y);
-      } else if (p.type === 'confetti') {
+      if (p.type === 'confetti') {
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rotation);
         ctx.fillStyle = p.color;

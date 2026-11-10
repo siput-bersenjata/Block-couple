@@ -507,7 +507,7 @@ setInterval(() => {
 }, 30 * 60 * 1000);
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🎮 Block Couple Server running on http://0.0.0.0:${PORT}`);
+  console.log(`[Block Couple] Server running on http://0.0.0.0:${PORT}`);
 });
 
 module.exports = app;

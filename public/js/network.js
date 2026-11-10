@@ -23,11 +23,11 @@ class NetworkManager {
   init() {
     // Check if PeerJS is available
     if (window.Peer) {
-      console.log('🌐 WebRTC (PeerJS) Engine Ready for Vercel!');
+      console.log('[Network] WebRTC Engine Ready for Vercel');
       this.mode = 'webrtc';
       this.updateConnectionBadge('connected');
     } else {
-      console.log('🔄 Fallback to Socket.io');
+      console.log('[Network] Fallback to Socket.io');
       this.initSocket();
     }
 
@@ -69,7 +69,7 @@ class NetworkManager {
     });
 
     this.peer.on('open', (id) => {
-      console.log('✓ Host Peer created with ID:', id);
+      console.log('[Network] Host Peer created with ID:', id);
       this.updateConnectionBadge('connected');
       this.onRoomReady(this.roomCode, 1, [
         { slot: 1, name: this.username }
@@ -77,7 +77,7 @@ class NetworkManager {
     });
 
     this.peer.on('connection', (conn) => {
-      console.log('🤝 Incoming connection from partner!');
+      console.log('[Network] Incoming connection from partner');
       this.conn = conn;
       this.setupDataConnection();
 
@@ -139,7 +139,7 @@ class NetworkManager {
       this.setupDataConnection();
 
       this.conn.on('open', () => {
-        console.log('✓ Connected to host!');
+        console.log('[Network] Connected to host');
         this.updateConnectionBadge('connected');
         this.send({
           type: 'join-request',
@@ -172,7 +172,7 @@ class NetworkManager {
       if (this.game) {
         this.game.peerPlayer.connected = false;
         this.updateRoomBadgeCount(1);
-        this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, "Partner Terputus! ⏳", '#ff9100', 20);
+        this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, "Partner Terputus!", '#ff9100', 20);
       }
     });
 
@@ -204,7 +204,7 @@ class NetworkManager {
         if (this.game) {
           this.game.peerPlayer.connected = true;
           this.game.peerPlayer.name = data.hostName;
-          this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, `${data.hostName} Siap! 💕`, '#00ffcc', 20);
+          this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, `${data.hostName} Siap!`, '#00ffcc', 20);
         }
         break;
 
@@ -213,7 +213,7 @@ class NetworkManager {
           this.game.peerPlayer.connected = true;
           this.game.peerPlayer.name = data.name;
           this.updateRoomBadgeCount(2);
-          this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, `${data.name} Bergabung! 💕`, '#00ffcc', 20);
+          this.game.addFloatingText(this.game.myPlayer.x, this.game.myPlayer.y - 40, `${data.name} Bergabung!`, '#00ffcc', 20);
           window.audioManager && window.audioManager.playKey();
         }
         break;
@@ -256,7 +256,7 @@ class NetworkManager {
           this.game.collectedKeys.push(data.keyId);
           this.game.updateKeyUI();
           window.audioManager && window.audioManager.playKey();
-          this.game.addFloatingText(this.game.peerPlayer.x, this.game.peerPlayer.y - 25, "KUNCI DIAMBIL! 🔑", '#ffd700', 16);
+          this.game.addFloatingText(this.game.peerPlayer.x, this.game.peerPlayer.y - 25, "KUNCI DIAMBIL!", '#ffd700', 16);
         }
         break;
 
@@ -277,7 +277,7 @@ class NetworkManager {
           const en = this.game.currentLevel.enemies && this.game.currentLevel.enemies.find(e => e.id === data.enemyId);
           if (en) {
             this.game.createSpawnSparks(en.x + en.width / 2, en.y + en.height / 2, '#ff007f');
-            this.game.addFloatingText(en.x, en.y - 20, "K.O! ⭐", '#ffd700', 18);
+            this.game.addFloatingText(en.x, en.y - 20, "K.O!", '#ffd700', 18);
           }
         }
         break;
@@ -315,7 +315,7 @@ class NetworkManager {
       case 'pong':
         this.ping = Date.now() - data.time;
         const pingEl = document.getElementById('pingBadge');
-        if (pingEl) pingEl.innerText = `📶 ${this.ping} ms`;
+        if (pingEl) pingEl.innerText = `Ping: ${this.ping} ms`;
         break;
     }
   }
@@ -378,10 +378,10 @@ class NetworkManager {
     const roleBadge = document.getElementById('roleBadge');
     if (roleBadge) {
       if (this.slot === 1) {
-        roleBadge.innerText = `${this.username} (Bobi 💙)`;
+        roleBadge.innerText = `${this.username} (Bobi)`;
         roleBadge.style.color = '#00e5ff';
       } else {
-        roleBadge.innerText = `${this.username} (Bona 💖)`;
+        roleBadge.innerText = `${this.username} (Bona)`;
         roleBadge.style.color = '#ff3b77';
       }
     }
@@ -392,13 +392,13 @@ class NetworkManager {
     if (!el) return;
     if (status === 'connected') {
       el.className = 'status-badge status-green';
-      el.innerText = '🟢 Siap Main (Vercel P2P)';
+      el.innerText = 'Online (P2P Ready)';
     } else if (status === 'connecting') {
       el.className = 'status-badge status-yellow';
-      el.innerText = '🟡 Menghubungkan Room...';
+      el.innerText = 'Menghubungkan Room...';
     } else {
       el.className = 'status-badge status-red';
-      el.innerText = '🔴 Terputus';
+      el.innerText = 'Terputus';
     }
   }
 
