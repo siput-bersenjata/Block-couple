@@ -59,6 +59,12 @@
         </button>
       </div>
 
+      <!-- Center Console Indicator (Visible in Portrait Split Mode) -->
+      <div class="touch-center-pad">
+        <div class="pad-brand">DUO QUEST</div>
+        <div class="pad-sub">CONSOLE PAD</div>
+      </div>
+
       <!-- Right Hand: Actions -->
       <div class="touch-group touch-right">
         <button id="btnClear" class="touch-btn action-btn btn-clear" aria-label="Hapus Balok">
@@ -201,6 +207,54 @@
     </div>
   </div>
 
+  <!-- EXIT VOTE MODAL (5-SECOND CO-OP MUTUAL AGREEMENT) -->
+  <div id="exitVoteModal" class="modal-overlay hidden">
+    <div class="modal-card exit-vote-card">
+      <div class="exit-vote-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ff3b77" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+      </div>
+
+      <!-- SENDER VIEW (Initiator waiting for partner) -->
+      <div id="exitVoteSenderView" class="exit-vote-view">
+        <h2 class="modal-title-sm">Ajakan Keluar Game</h2>
+        <p id="exitVoteSenderText" class="exit-vote-desc">
+          Menunggu persetujuan partner untuk keluar ke Beranda...
+        </p>
+        <div class="exit-timer-container">
+          <div class="exit-timer-bar-wrap">
+            <div id="exitVoteSenderProgress" class="exit-timer-bar"></div>
+          </div>
+          <div id="exitVoteSenderTimer" class="exit-timer-label">5s</div>
+        </div>
+        <div class="exit-vote-actions">
+          <button id="btnCancelExitVote" class="btn-cancel">Batalkan Ajakan</button>
+        </div>
+      </div>
+
+      <!-- RECEIVER VIEW (Partner prompted to agree or stay) -->
+      <div id="exitVoteReceiverView" class="exit-vote-view hidden">
+        <h2 class="modal-title-sm">Ajakan Keluar Game</h2>
+        <p id="exitVoteReceiverText" class="exit-vote-desc">
+          Partner mengajak keluar ke Beranda Katalog Game.
+        </p>
+        <div class="exit-timer-container">
+          <div class="exit-timer-bar-wrap">
+            <div id="exitVoteReceiverProgress" class="exit-timer-bar"></div>
+          </div>
+          <div id="exitVoteReceiverTimer" class="exit-timer-label">5s</div>
+        </div>
+        <div class="exit-vote-actions duo-actions">
+          <button id="btnAcceptExitVote" class="btn-primary btn-exit-agree">Setuju Keluar</button>
+          <button id="btnDeclineExitVote" class="btn-secondary btn-exit-stay">Tetap Main</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST NOTIFICATION -->
   <div id="toast" class="toast hidden">Link Berhasil Disalin!</div>
 
@@ -279,11 +333,22 @@
         window.networkManager.joinRoom(code, getUsername());
       });
 
-      // In-game Exit / Leave room
+      // In-game Exit / Leave room (5-second mutual co-op exit vote)
       document.getElementById('btnExitRoom').addEventListener('click', () => {
-        if (confirm('Keluar dari Room dan kembali ke Beranda?')) {
-          window.networkManager.leaveRoom();
-        }
+        window.audioManager.init();
+        window.networkManager.requestExitVote();
+      });
+
+      document.getElementById('btnCancelExitVote').addEventListener('click', () => {
+        window.networkManager.cancelExitVote();
+      });
+
+      document.getElementById('btnAcceptExitVote').addEventListener('click', () => {
+        window.networkManager.acceptExitVote();
+      });
+
+      document.getElementById('btnDeclineExitVote').addEventListener('click', () => {
+        window.networkManager.declineExitVote();
       });
 
       document.getElementById('btnCopyLink').addEventListener('click', () => {
@@ -312,8 +377,9 @@
         e.target.innerText = isMuted ? 'Audio OFF' : 'Audio ON';
       });
 
-      function showToast(msg) {
+      window.showToast = function(msg) {
         const toast = document.getElementById('toast');
+        if (!toast) return;
         toast.innerText = msg;
         toast.classList.remove('hidden');
         toast.classList.add('visible');
@@ -321,7 +387,7 @@
           toast.classList.remove('visible');
           setTimeout(() => toast.classList.add('hidden'), 300);
         }, 2500);
-      }
+      };
     });
   </script>
 </body>

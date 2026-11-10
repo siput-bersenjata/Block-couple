@@ -261,28 +261,49 @@ class GameEngine {
   setupResize() {
     const handleResize = () => {
       const container = document.getElementById('gameContainer');
+      const appContainer = document.getElementById('appContainer');
       if (!container) return;
       const w = window.innerWidth;
       const h = window.innerHeight;
 
-      // In portrait on phones, reserve space for touch buttons at bottom
       const isPortrait = w < h;
-      const reservedBottom = isPortrait ? 180 : 80;
-      const availableH = Math.max(160, h - reservedBottom);
-      const availableW = Math.max(280, w - 16);
+      if (appContainer) {
+        appContainer.classList.toggle('mode-portrait', isPortrait);
+        appContainer.classList.toggle('mode-landscape', !isPortrait);
+      }
 
-      let scale = Math.min(availableW / CANVAS_WIDTH, availableH / CANVAS_HEIGHT);
-      if (scale > 1.25) scale = 1.25;
-      if (scale < 0.28) scale = 0.28;
-
-      this.canvas.style.width = `${Math.floor(CANVAS_WIDTH * scale)}px`;
-      this.canvas.style.height = `${Math.floor(CANVAS_HEIGHT * scale)}px`;
+      if (isPortrait) {
+        // PORTRAIT SPLIT MODE:
+        // Top game canvas takes full width 100vw, 16:9 ratio
+        // Capped so it doesn't take more than 46% of viewport height
+        let canvasW = w;
+        let canvasH = Math.round(w * CANVAS_HEIGHT / CANVAS_WIDTH);
+        const maxH = Math.floor(h * 0.46);
+        if (canvasH > maxH) {
+          canvasH = maxH;
+          canvasW = Math.round(canvasH * CANVAS_WIDTH / CANVAS_HEIGHT);
+        }
+        this.canvas.style.width = `${canvasW}px`;
+        this.canvas.style.height = `${canvasH}px`;
+      } else if (h <= 650) {
+        // MOBILE LANDSCAPE: Fullscreen edge-to-edge
+        // Touch controls float inside the canvas corners
+        const scale = Math.min(w / CANVAS_WIDTH, h / CANVAS_HEIGHT);
+        this.canvas.style.width = `${Math.floor(CANVAS_WIDTH * scale)}px`;
+        this.canvas.style.height = `${Math.floor(CANVAS_HEIGHT * scale)}px`;
+      } else {
+        // DESKTOP / TABLET LANDSCAPE
+        const scale = Math.min((w - 32) / CANVAS_WIDTH, (h - 140) / CANVAS_HEIGHT, 1.25);
+        this.canvas.style.width = `${Math.floor(CANVAS_WIDTH * scale)}px`;
+        this.canvas.style.height = `${Math.floor(CANVAS_HEIGHT * scale)}px`;
+      }
     };
 
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleResize);
-    setTimeout(handleResize, 100);
-    setTimeout(handleResize, 500);
+    setTimeout(handleResize, 50);
+    setTimeout(handleResize, 300);
+    setTimeout(handleResize, 1000);
   }
 
   requestPlaceBlock() {

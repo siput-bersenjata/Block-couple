@@ -27,6 +27,11 @@ class NetworkManager {
     this.maxReconnectAttempts = 6;
     this.reconnectTimer = null;
 
+    // Co-op Exit vote timer & state (5-second mutual agreement)
+    this.exitVoteTimer = null;
+    this.exitVoteSecondsLeft = 5;
+    this.exitVoteActive = false;
+
     this.init();
   }
 
@@ -789,6 +794,22 @@ class NetworkManager {
         const pingEl = document.getElementById('pingBadge');
         if (pingEl) pingEl.innerText = `Ping: ${this.ping} ms`;
         break;
+
+      case 'exit-vote-request':
+        this.handleExitVoteRequest(data.sender);
+        break;
+
+      case 'exit-vote-agreed':
+        this.handleExitVoteAgreed();
+        break;
+
+      case 'exit-vote-declined':
+        this.handleExitVoteDeclined();
+        break;
+
+      case 'exit-vote-cancelled':
+        this.handleExitVoteCancelled();
+        break;
     }
   }
 
@@ -848,9 +869,166 @@ class NetworkManager {
   }
 
   // ========================================================
+  // CO-OP EXIT VOTE SYSTEM (5 SECONDS MUTUAL AGREEMENT)
+  // ========================================================
+  requestExitVote() {
+    const isCoopConnected = this.game && this.game.peerPlayer && this.game.peerPlayer.connected && this.conn && this.conn.open;
+    if (!isCoopConnected) {
+      if (confirm('Keluar dari Room dan kembali ke Beranda?')) {
+        this.leaveRoom();
+      }
+      return;
+    }
+
+    if (this.exitVoteTimer) clearInterval(this.exitVoteTimer);
+    this.exitVoteActive = true;
+    this.exitVoteSecondsLeft = 5;
+
+    this.send({
+      type: 'exit-vote-request',
+      sender: this.username
+    });
+
+    const modal = document.getElementById('exitVoteModal');
+    const senderView = document.getElementById('exitVoteSenderView');
+    const receiverView = document.getElementById('exitVoteReceiverView');
+    const senderDesc = document.getElementById('exitVoteSenderText');
+    const timerLabel = document.getElementById('exitVoteSenderTimer');
+    const progressBar = document.getElementById('exitVoteSenderProgress');
+
+    if (modal && senderView && receiverView) {
+      senderView.classList.remove('hidden');
+      receiverView.classList.add('hidden');
+      modal.classList.remove('hidden');
+
+      const partnerName = (this.game && this.game.peerPlayer && this.game.peerPlayer.name) ? this.game.peerPlayer.name : 'Partner';
+      if (senderDesc) senderDesc.innerText = `Menunggu persetujuan ${partnerName} untuk keluar...`;
+      if (timerLabel) timerLabel.innerText = '5s';
+      if (progressBar) {
+        progressBar.style.transition = 'none';
+        progressBar.style.width = '100%';
+        setTimeout(() => {
+          if (progressBar) {
+            progressBar.style.transition = 'width 5s linear';
+            progressBar.style.width = '0%';
+          }
+        }, 30);
+      }
+    }
+
+    this.exitVoteTimer = setInterval(() => {
+      this.exitVoteSecondsLeft--;
+      if (timerLabel) timerLabel.innerText = `${this.exitVoteSecondsLeft}s`;
+      if (this.exitVoteSecondsLeft <= 0) {
+        this.finishExitVoteTimeout();
+      }
+    }, 1000);
+  }
+
+  handleExitVoteRequest(senderName) {
+    if (this.exitVoteTimer) clearInterval(this.exitVoteTimer);
+    this.exitVoteActive = true;
+    this.exitVoteSecondsLeft = 5;
+
+    const modal = document.getElementById('exitVoteModal');
+    const senderView = document.getElementById('exitVoteSenderView');
+    const receiverView = document.getElementById('exitVoteReceiverView');
+    const receiverDesc = document.getElementById('exitVoteReceiverText');
+    const timerLabel = document.getElementById('exitVoteReceiverTimer');
+    const progressBar = document.getElementById('exitVoteReceiverProgress');
+
+    if (modal && senderView && receiverView) {
+      senderView.classList.add('hidden');
+      receiverView.classList.remove('hidden');
+      modal.classList.remove('hidden');
+
+      if (receiverDesc) {
+        receiverDesc.innerText = `${senderName || 'Partner'} mengajak keluar ke Beranda Katalog Game.`;
+      }
+      if (timerLabel) timerLabel.innerText = '5s';
+      if (progressBar) {
+        progressBar.style.transition = 'none';
+        progressBar.style.width = '100%';
+        setTimeout(() => {
+          if (progressBar) {
+            progressBar.style.transition = 'width 5s linear';
+            progressBar.style.width = '0%';
+          }
+        }, 30);
+      }
+    }
+
+    this.exitVoteTimer = setInterval(() => {
+      this.exitVoteSecondsLeft--;
+      if (timerLabel) timerLabel.innerText = `${this.exitVoteSecondsLeft}s`;
+      if (this.exitVoteSecondsLeft <= 0) {
+        this.finishExitVoteTimeout();
+      }
+    }, 1000);
+  }
+
+  acceptExitVote() {
+    this.send({ type: 'exit-vote-agreed' });
+    this.closeExitVoteModal();
+    this.leaveRoom();
+    this.showToast('Kedua pemain setuju keluar ke Beranda');
+  }
+
+  handleExitVoteAgreed() {
+    this.closeExitVoteModal();
+    this.leaveRoom();
+    this.showToast('Kedua pemain setuju keluar ke Beranda');
+  }
+
+  declineExitVote() {
+    this.send({ type: 'exit-vote-declined' });
+    this.closeExitVoteModal();
+    this.showToast('Kamu memilih tetap bermain');
+  }
+
+  handleExitVoteDeclined() {
+    this.closeExitVoteModal();
+    const partnerName = (this.game && this.game.peerPlayer && this.game.peerPlayer.name) ? this.game.peerPlayer.name : 'Partner';
+    this.showToast(`${partnerName} memilih untuk tetap bermain`);
+  }
+
+  cancelExitVote() {
+    this.send({ type: 'exit-vote-cancelled' });
+    this.closeExitVoteModal();
+    this.showToast('Ajakan keluar dibatalkan');
+  }
+
+  handleExitVoteCancelled() {
+    this.closeExitVoteModal();
+    this.showToast('Ajakan keluar dibatalkan oleh partner');
+  }
+
+  finishExitVoteTimeout() {
+    this.closeExitVoteModal();
+    this.showToast('Waktu ajakan keluar 5 detik habis');
+  }
+
+  closeExitVoteModal() {
+    if (this.exitVoteTimer) {
+      clearInterval(this.exitVoteTimer);
+      this.exitVoteTimer = null;
+    }
+    this.exitVoteActive = false;
+    const modal = document.getElementById('exitVoteModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  showToast(msg) {
+    if (window.showToast) {
+      window.showToast(msg);
+    }
+  }
+
+  // ========================================================
   // LEAVE ROOM / RETURN TO LOBBY
   // ========================================================
   leaveRoom() {
+    this.closeExitVoteModal();
     this.clearSession();
 
     // Reset URL to clean base
