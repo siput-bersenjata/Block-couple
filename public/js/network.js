@@ -867,6 +867,15 @@ class NetworkManager {
           if (data.pacAngle !== undefined) peer.pacAngle = data.pacAngle;
           if (data.isMoving !== undefined) peer.isMoving = data.isMoving;
           if (data.chompTimer !== undefined) peer.chompTimer = data.chompTimer;
+          if (data.snakeDir !== undefined && this.game.snake) {
+            const peerSnake = this.game.localSlot === 1 ? this.game.snake.p2 : this.game.snake.p1;
+            if (peerSnake) {
+              peerSnake.nextDir = data.snakeDir;
+              if (data.snakeTurbo !== undefined) {
+                peerSnake.isTurbo = !!data.snakeTurbo;
+              }
+            }
+          }
           peer.isGrounded = data.isGrounded;
           peer.targetTilt = data.tilt || 0;
           peer.targetSquashX = data.squashX || 1;

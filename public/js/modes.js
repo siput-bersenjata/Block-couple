@@ -107,6 +107,92 @@
       }
     };
 
+    // Universal In-Canvas Glassmorphic HUD Renderer
+    // Renders complete, polished, never-cut-off game metrics across all arcade modes
+    GameEngine.prototype.renderCanvasHUD = function (options) {
+      const ctx = this.ctx;
+      const {
+        leftBadge = '',
+        leftColor = '#00e5ff',
+        centerBadge = '',
+        centerColor = '#f59e0b',
+        rightBadge = '',
+        rightColor = '#ffd700'
+      } = options;
+
+      ctx.save();
+      const topY = 14;
+      const height = 34;
+
+      // 1. Left HUD Badge Pill
+      if (leftBadge) {
+        ctx.font = '800 14px Outfit, sans-serif';
+        const leftText = leftBadge;
+        const textWidth = ctx.measureText(leftText).width;
+        const pillW = Math.max(120, textWidth + 28);
+        const pillX = 24;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.40)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        drawRoundRect(ctx, pillX, topY, pillW, height, 17);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = leftColor;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(leftText, pillX + pillW / 2, topY + height / 2 + 1);
+      }
+
+      // 2. Center HUD Badge Pill
+      if (centerBadge) {
+        ctx.font = '800 14px Outfit, sans-serif';
+        const centerText = centerBadge;
+        const textWidth = ctx.measureText(centerText).width;
+        const pillW = Math.max(150, textWidth + 32);
+        const pillX = 480 - pillW / 2;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        drawRoundRect(ctx, pillX, topY, pillW, height, 17);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = centerColor;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(centerText, 480, topY + height / 2 + 1);
+      }
+
+      // 3. Right Score HUD Badge Pill (ALWAYS right-aligned, 24px safe margin from 960 edge)
+      if (rightBadge) {
+        ctx.font = '800 15px Outfit, sans-serif';
+        const rightText = rightBadge;
+        const textWidth = ctx.measureText(rightText).width;
+        const pillW = Math.max(140, textWidth + 32);
+        const pillX = 936 - pillW; // Safely lands at 936, NEVER cuts off at 960
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.50)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        drawRoundRect(ctx, pillX, topY, pillW, height, 17);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = rightColor;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(rightText, pillX + pillW / 2, topY + height / 2 + 1);
+      }
+
+      ctx.restore();
+    };
+
     // Update Touch Controls & HUD text for each mode
     GameEngine.prototype.updateModeControls = function () {
       const btnJump = document.getElementById('btnJump');
@@ -412,14 +498,15 @@
       this.renderParticles(ctx);
       this.renderFloatingTexts(ctx);
 
-      // HUD Overlay
-      ctx.save();
-      ctx.font = '700 16px Outfit, sans-serif';
-      ctx.fillStyle = '#00e5ff';
-      ctx.fillText(`WAVE: ${s.wave}`, 40, 40);
-      ctx.fillStyle = '#ffd700';
-      ctx.fillText(`SKOR CO-OP: ${s.score}`, 820, 40);
-      ctx.restore();
+      // Modern Never-Cut-Off Canvas HUD
+      this.renderCanvasHUD({
+        leftBadge: `GELOMBANG: ${s.wave}  |  ALIEN: ${s.aliens.length}`,
+        leftColor: '#00e5ff',
+        centerBadge: (this.gameTitle || 'DUO SPACE BLASTER').toUpperCase(),
+        centerColor: '#c084fc',
+        rightBadge: `SKOR: ${s.score} PTS`,
+        rightColor: '#ffd700'
+      });
     };
 
     GameEngine.prototype.drawSpaceShip = function (ctx, x, y, type) {
@@ -1040,20 +1127,15 @@
       this.renderParticles(ctx);
       this.renderFloatingTexts(ctx);
 
-      // HUD Overlay with Difficulty Indicator
-      ctx.save();
-      ctx.font = '800 15px Outfit, sans-serif';
-      ctx.fillStyle = '#00e5ff';
-      ctx.fillText(`TANK MUSUH: ${t.enemyTanks.length}`, 40, 36);
-
-      ctx.fillStyle = '#f59e0b';
-      ctx.textAlign = 'center';
-      ctx.fillText(`TINGKAT: LEVEL ${t.level} (${(t.diffName || 'NORMAL').toUpperCase()})`, 480, 36);
-
-      ctx.fillStyle = '#ffd700';
-      ctx.textAlign = 'right';
-      ctx.fillText(`SKOR: ${t.score}`, 920, 36);
-      ctx.restore();
+      // Modern Never-Cut-Off Canvas HUD with Difficulty Indicator
+      this.renderCanvasHUD({
+        leftBadge: `TANK MUSUH: ${t.enemyTanks.length}`,
+        leftColor: '#00e5ff',
+        centerBadge: `TINGKAT: LEVEL ${t.level} (${(t.diffName || 'NORMAL').toUpperCase()})`,
+        centerColor: '#f59e0b',
+        rightBadge: `SKOR: ${t.score} PTS`,
+        rightColor: '#ffd700'
+      });
     };
 
     GameEngine.prototype.drawTankSprite = function (ctx, x, y, angle, color, type = 'standard') {
@@ -1566,14 +1648,18 @@
       this.renderParticles(ctx);
       this.renderFloatingTexts(ctx);
 
-      // HUD
-      ctx.save();
-      ctx.font = '700 16px Outfit, sans-serif';
-      ctx.fillStyle = '#00e5ff';
-      ctx.fillText(`TITIK SISA: ${p.dots.length}`, 50, 30);
-      ctx.fillStyle = '#ffd700';
-      ctx.fillText(`SKOR: ${p.score}`, 820, 30);
-      ctx.restore();
+      // Modern Never-Cut-Off Canvas HUD
+      const centerMsg = (p.frightenedTimer || 0) > 0
+        ? `HANTU BIRU: ${Math.ceil(p.frightenedTimer)}S`
+        : (this.gameTitle || 'DUO PAC-MAZE').toUpperCase();
+      this.renderCanvasHUD({
+        leftBadge: `TITIK SISA: ${p.dots.length}`,
+        leftColor: '#00e5ff',
+        centerBadge: centerMsg,
+        centerColor: (p.frightenedTimer || 0) > 0 ? '#38bdf8' : '#e2e8f0',
+        rightBadge: `SKOR: ${p.score} PTS`,
+        rightColor: '#ffd700'
+      });
     };
 
     GameEngine.prototype.drawGhostSprite = function (ctx, x, y, color, isFrightened, vx = 0, vy = 0) {
@@ -1902,14 +1988,15 @@
       this.renderParticles(ctx);
       this.renderFloatingTexts(ctx);
 
-      // HUD
-      ctx.save();
-      ctx.font = '700 16px Outfit, sans-serif';
-      ctx.fillStyle = '#00e5ff';
-      ctx.fillText(`KOMBO: ${m.streak}x`, 50, 40);
-      ctx.fillStyle = '#ffd700';
-      ctx.fillText(`SKOR: ${m.score}`, 840, 40);
-      ctx.restore();
+      // Modern Never-Cut-Off Canvas HUD
+      this.renderCanvasHUD({
+        leftBadge: `KOMBO: ${m.streak}x  |  SISA: ${Math.ceil(m.timer)}S`,
+        leftColor: '#00e5ff',
+        centerBadge: `SOAL: ${m.question} = ?`,
+        centerColor: '#c084fc',
+        rightBadge: `SKOR: ${m.score} PTS`,
+        rightColor: '#ffd700'
+      });
     };
 
     GameEngine.prototype.renderPlayer = function (player, type) {
@@ -2173,17 +2260,15 @@
       this.renderParticles(ctx);
       this.renderFloatingTexts(ctx);
 
-      // In-game Mode HUD
-      ctx.save();
-      ctx.font = '700 16px Outfit, sans-serif';
-      ctx.fillStyle = '#00e5ff';
-      ctx.fillText(`BOBI: ${s.p1.length} SEGMEN`, boardX, 32);
-      ctx.fillStyle = '#ff3b77';
-      ctx.fillText(`BONA: ${s.p2.length} SEGMEN`, boardX + 220, 32);
-      ctx.fillStyle = '#ffd700';
-      ctx.textAlign = 'right';
-      ctx.fillText(`SKOR DUO: ${s.score} PTS`, boardX + boardW, 32);
-      ctx.restore();
+      // Modern Never-Cut-Off Canvas HUD
+      this.renderCanvasHUD({
+        leftBadge: `BOBI: ${s.p1.length}  |  BONA: ${s.p2.length}`,
+        leftColor: '#00e5ff',
+        centerBadge: (this.gameTitle || 'DUO SNAKE').toUpperCase(),
+        centerColor: '#22c55e',
+        rightBadge: `SKOR: ${s.score} PTS`,
+        rightColor: '#ffd700'
+      });
     };
 
     GameEngine.prototype.drawOneSnake = function (ctx, snk) {
@@ -2449,16 +2534,15 @@
       this.renderParticles(ctx);
       this.renderFloatingTexts(ctx);
 
-      // HUD Overlay
-      ctx.save();
-      ctx.font = '800 18px Outfit, sans-serif';
-      ctx.fillStyle = '#00e5ff';
-      ctx.fillText(`RELI: ${p.rally} HITS`, 480, 32);
-      ctx.font = '700 16px Outfit, sans-serif';
-      ctx.fillStyle = '#ffd700';
-      ctx.textAlign = 'right';
-      ctx.fillText(`SKOR: ${p.score} PTS`, 920, 32);
-      ctx.restore();
+      // Modern Never-Cut-Off Canvas HUD
+      this.renderCanvasHUD({
+        leftBadge: `RELI TERBAIK: ${p.maxRally || p.rally}`,
+        leftColor: '#00e5ff',
+        centerBadge: `RELI: ${p.rally} PANTULAN`,
+        centerColor: '#38bdf8',
+        rightBadge: `SKOR: ${p.score} PTS`,
+        rightColor: '#ffd700'
+      });
     };
 
     GameEngine.prototype.drawPongPaddle = function (ctx, pad) {
