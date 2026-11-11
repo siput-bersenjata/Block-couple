@@ -350,6 +350,7 @@
   <script src="js/levels.js"></script>
   <script src="js/game.js"></script>
   <script src="js/network.js"></script>
+  <script src="js/previews.js"></script>
 
   <!-- UI Event Bindings & LocalStorage -->
   <script>
@@ -484,7 +485,7 @@
         });
       }
 
-      // Render 20 Co-op games in Catalog
+      // Render 20 Co-op games in Catalog with Illustration & Live Gameplay Previews
       window.renderGameCatalog = function() {
         const container = document.getElementById('catalogGamesGrid');
         if (!container || !window.COOP_GAMES) return;
@@ -497,7 +498,17 @@
                 <span class="game-number">GAME #${gameNum}</span>
                 <span class="game-tag-badge">${game.tag}</span>
               </div>
-              <h3 class="game-card-title">${game.title}</h3>
+
+              <div class="game-preview-container" data-game-id="${game.id}">
+                <canvas class="game-preview-canvas" width="280" height="140" data-game-id="${game.id}"></canvas>
+                <div class="preview-badge">
+                  <span class="badge-dot"></span>
+                  <span class="badge-text">CUPLIKAN GAMEPLAY</span>
+                </div>
+                <div class="preview-hover-hint">Arahkan kursor untuk cuplikan gerak</div>
+              </div>
+
+              <h3 class="game-card-title" title="Arahkan kursor untuk cuplikan gerak">${game.title}</h3>
               <p class="game-card-desc">${game.desc}</p>
               
               <div class="game-level-select-row">
@@ -513,6 +524,10 @@
             </div>
           `;
         }).join('');
+
+        if (window.CatalogPreviewManager) {
+          setTimeout(() => window.CatalogPreviewManager.init(), 10);
+        }
       };
 
       // Initial render of catalog
