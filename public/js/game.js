@@ -245,6 +245,7 @@ class GameEngine {
       el.addEventListener('mouseleave', onEnd);
     };
 
+    bindTouchBtn('btnUp', () => { this.touchState.up = true; }, () => { this.touchState.up = false; });
     bindTouchBtn('btnLeft', () => { this.touchState.left = true; }, () => { this.touchState.left = false; });
     bindTouchBtn('btnRight', () => { this.touchState.right = true; }, () => { this.touchState.right = false; });
     bindTouchBtn('btnDown', () => { this.touchState.down = true; }, () => { this.touchState.down = false; });

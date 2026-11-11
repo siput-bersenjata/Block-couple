@@ -535,26 +535,219 @@ const GAME_LEVELS = [
 // 20 CO-OP GAMES CATALOG (KATALOG DAFTAR GAME CO-OP 2 PEMAIN)
 // ========================================================
 const COOP_GAMES = [
-  { id: 1, title: 'Duo Quest: Gerbang Awal', tag: 'Petualangan Co-op', desc: 'Bekerjasama membuat balok dan menginjak monster lendir untuk membuka pintu portal.', targetLevel: 1, maxLevel: 10 },
-  { id: 2, title: 'Tebing Pegas & Drone Udara', tag: 'Ketangkasan Pegas', desc: 'Lompat menggunakan trampolin pegas dan hindari patroli drone pengawas tebing.', targetLevel: 2, maxLevel: 10 },
-  { id: 3, title: 'Labirin Saklar & Sinar Laser', tag: 'Teka-Teki Saklar', desc: 'Satu pemain menahan saklar agar laser padam sehingga pasangan bisa melintas.', targetLevel: 3, maxLevel: 10 },
-  { id: 4, title: 'Jurang Nebula & Kawanan Drone', tag: 'Platformer Presisi', desc: 'Susun balok jembatan di atas jurang luas tanpa terjatuh ke ladang duri.', targetLevel: 4, maxLevel: 10 },
-  { id: 5, title: 'Menara Puncak Cinta Duo', tag: 'Ujian Kerjasama', desc: 'Naiki platform bergerak ke menara tertinggi dan kumpulkan kunci emas bersama.', targetLevel: 5, maxLevel: 10 },
-  { id: 6, title: 'Lava Rush: Lantai Membara', tag: 'Survival Cepat', desc: 'Jauhi lantai bawah tanah yang membara, bangun pijakan balok secepat mungkin.', targetLevel: 6, maxLevel: 10 },
-  { id: 7, title: 'Benteng Saklar Ganda', tag: 'Sinkronisasi Saklar', desc: 'Dua gerbang laser harus dibuka bergantian oleh Bobi dan Bona secara estafet.', targetLevel: 7, maxLevel: 10 },
-  { id: 8, title: 'Tebing Kristal Es', tag: 'Presisi & Estafet', desc: 'Tebing es licin dan jurang luas, buat balok bertingkat agar partner bisa memanjat.', targetLevel: 8, maxLevel: 10 },
-  { id: 9, title: 'Menara Tiga Drone Pengawas', tag: 'Hindaran Udara', desc: 'Hindari tiga drone berkecepatan tinggi dengan bersembunyi di bawah platform balok.', targetLevel: 9, maxLevel: 10 },
-  { id: 10, title: 'Ujian Puncak Pasangan Sejati', tag: 'Tantangan Pamungkas', desc: 'Ujian terakhir: gabungan semua rintangan, laser, pegas, dan jurang berduri dalam 1 level!', targetLevel: 10, maxLevel: 10 },
-  { id: 11, title: 'Jembatan Runtuh & Balok Cepat', tag: 'Kecepatan Balok', desc: 'Platform mudah runtuh, pemain harus saling menaruh balok darurat untuk partner.', targetLevel: 1, maxLevel: 10 },
-  { id: 12, title: 'Labirin Saklar Berantai', tag: 'Sinkronisasi Teka-Teki', desc: 'Dua saklar harus ditekan bergantian dari dua sisi tebing berbeda untuk menembus lorong.', targetLevel: 3, maxLevel: 10 },
-  { id: 13, title: 'Arena Lendir Monster Kembar', tag: 'Aksi Timpukan', desc: 'Musuh lendir berpatroli ketat, gunakan balok dari atas untuk mengurung mereka.', targetLevel: 1, maxLevel: 10 },
-  { id: 14, title: 'Tebing Angin & Drone Gesit', tag: 'Manuver Udara', desc: 'Waspadai ritme drone yang menukik cepat saat melompat antar platform.', targetLevel: 4, maxLevel: 10 },
-  { id: 15, title: 'Koridor Duri Bergerak', tag: 'Ketangkasan Lompat', desc: 'Platform bergerak melintasi ladang duri, lompat di saat yang tepat!', targetLevel: 2, maxLevel: 10 },
-  { id: 16, title: 'Teka-Teki Pintu Kembar', tag: 'Koleksi Kunci', desc: 'Kunci terpisah di ujung peta memerlukan kedua pemain bergerak ke dua arah berlawanan.', targetLevel: 4, maxLevel: 10 },
-  { id: 17, title: 'Menara Lift Bergantian', tag: 'Elevator Co-op', desc: 'Naiki moving platform bertingkat yang bergerak dengan ritme berbeda menuju puncak.', targetLevel: 5, maxLevel: 10 },
-  { id: 18, title: 'Gua Kristal & Platform Goyang', tag: 'Keseimbangan Balok', desc: 'Platform sempit membutuhkan kerjasama estafet balok agar tidak terjatuh.', targetLevel: 6, maxLevel: 10 },
-  { id: 19, title: 'Pertempuran Saklar Waktu', tag: 'Uji Kecepatan', desc: 'Gerbang laser terbuka hanya sebentar setelah saklar dilepas, lari cepat!', targetLevel: 7, maxLevel: 10 },
-  { id: 20, title: 'Puncak Kejayaan Pasangan Abadi', tag: 'Level Kehormatan', desc: 'Ujian penutup menuju portal kemenangan abadi dengan skor bonus tertinggi.', targetLevel: 10, maxLevel: 10 }
+  // 1. SHOOTER CO-OP (TEMBAK-TEMBAKAN LUAR ANGKASA & ALIEN)
+  { 
+    id: 1, 
+    title: 'Duo Space Blaster: Invasi Alien', 
+    mode: 'shooter', 
+    tag: 'Tembak-Tembakan', 
+    category: 'shooter',
+    desc: 'Kendalikan pesawat laser berdua, tembak jatuh armada alien UFO dan hindari hujan bom plasma luar angkasa!',
+    targetLevel: 1, 
+    maxLevel: 10 
+  },
+  { 
+    id: 2, 
+    title: 'Laser Strike: Armada Bos Galaksi', 
+    mode: 'shooter', 
+    tag: 'Tembak-Tembakan', 
+    category: 'shooter',
+    desc: 'Pertahanan laser intensif! Tembak drone alien pengawal galaksi dan kumpulkan kristal peluru energi bersama.',
+    targetLevel: 2, 
+    maxLevel: 10 
+  },
+
+  // 2. TANK BATTLE CO-OP (PERANG TANK BAJA 2D)
+  { 
+    id: 3, 
+    title: 'Duo Tank Baja: Perang Benteng', 
+    mode: 'tank', 
+    tag: 'Tank-Tankan', 
+    category: 'tank',
+    desc: 'Kendarai tank tempur baja neon, hancurkan dinding bata rintangan dan tembak tank musuh dengan meriam pantul!',
+    targetLevel: 3, 
+    maxLevel: 10 
+  },
+  { 
+    id: 4, 
+    title: 'Arena Tank Gurun: Operasi Baja', 
+    mode: 'tank', 
+    tag: 'Tank-Tankan', 
+    category: 'tank',
+    desc: 'Pertempuran taktis 2 pemain melawan konvoi tank robot otomatis di labirin medan perang berpasir.',
+    targetLevel: 4, 
+    maxLevel: 10 
+  },
+
+  // 3. PAC-MAN / PICMAN CO-OP (LABIRIN TITIK & HANTU)
+  { 
+    id: 5, 
+    title: 'Duo Pac-Maze: Labirin Hantu', 
+    mode: 'pacman', 
+    tag: 'Picman Co-op', 
+    category: 'pacman',
+    desc: 'Makan semua pelet titik energi di labirin neon! Hindari kejaran hantu Blinky & Inky atau makan Pelet Kekuatan raksasa!',
+    targetLevel: 5, 
+    maxLevel: 10 
+  },
+  { 
+    id: 6, 
+    title: 'Pac-Man Neon: Pesta Titik Kristal', 
+    mode: 'pacman', 
+    tag: 'Picman Co-op', 
+    category: 'pacman',
+    desc: 'Labirin kecepatan tinggi dengan portal teleportasi estafet. Kerjasama memakan semua titik sebelum hantu mengepung.',
+    targetLevel: 6, 
+    maxLevel: 10 
+  },
+
+  // 4. SOAL MATEMATIKA CO-OP (KUIS HITUNG TANGKAS & ASAH OTAK)
+  { 
+    id: 7, 
+    title: 'Kuis Matematika: Jembatan Angka', 
+    mode: 'math', 
+    tag: 'Soal Matematika', 
+    category: 'math',
+    desc: 'Pecahkan persamaan matematika di layar! Injak portal angka yang benar bersama pasanganmu untuk membuka jalan.',
+    targetLevel: 7, 
+    maxLevel: 10 
+  },
+  { 
+    id: 8, 
+    title: 'Duel Otak: Kilat Hitung Cepat', 
+    mode: 'math', 
+    tag: 'Soal Matematika', 
+    category: 'math',
+    desc: 'Adu kecerdasan dan kerjasama! Jawab soal perkalian dan penjumlahan kilat untuk mencetak rekor skor kombo tertinggi.',
+    targetLevel: 8, 
+    maxLevel: 10 
+  },
+
+  // 5. ARCADE PONG / AIR HOCKEY (REFLEKS CEPAT)
+  { 
+    id: 9, 
+    title: 'Neon Pong: Pertarungan Refleks', 
+    mode: 'pong', 
+    tag: 'Arcade Pong', 
+    category: 'arcade',
+    desc: 'Tangkis bola energi neon bercahaya dengan raket pantul berdua dalam duel kecepatan reaksi tingkat tinggi!',
+    targetLevel: 9, 
+    maxLevel: 10 
+  },
+
+  // 6. SNAKE CO-OP (DUO ULAR NEON)
+  { 
+    id: 10, 
+    title: 'Duo Snake: Pemburu Bintang Energi', 
+    mode: 'snake', 
+    tag: 'Snake Co-op', 
+    category: 'arcade',
+    desc: 'Dua ular neon tumbuh panjang saat mengumpulkan bintang energi. Bekerjasama meliuk di arena tanpa tabrakan.',
+    targetLevel: 10, 
+    maxLevel: 10 
+  },
+
+  // 7. PLATFORMER KLASIK & TEKA-TEKI DUO QUEST
+  { 
+    id: 11, 
+    title: 'Duo Quest: Gerbang Awal & Monster Lendir', 
+    mode: 'platformer', 
+    tag: 'Petualangan Co-op', 
+    category: 'platformer',
+    desc: 'Bekerjasama membuat balok dan menginjak monster lendir untuk membuka pintu portal cinta.',
+    targetLevel: 1, 
+    maxLevel: 10 
+  },
+  { 
+    id: 12, 
+    title: 'Tebing Pegas & Drone Udara', 
+    mode: 'platformer', 
+    tag: 'Ketangkasan Pegas', 
+    category: 'platformer',
+    desc: 'Lompat menggunakan trampolin pegas elastis dan hindari patroli drone pengawas tebing.',
+    targetLevel: 2, 
+    maxLevel: 10 
+  },
+  { 
+    id: 13, 
+    title: 'Labirin Saklar & Sinar Laser', 
+    mode: 'platformer', 
+    tag: 'Teka-Teki Saklar', 
+    category: 'platformer',
+    desc: 'Satu pemain menahan tombol saklar agar laser padam sehingga pasangan bisa melintas aman.',
+    targetLevel: 3, 
+    maxLevel: 10 
+  },
+  { 
+    id: 14, 
+    title: 'Jurang Nebula & Jembatan Balok', 
+    mode: 'platformer', 
+    tag: 'Platformer Presisi', 
+    category: 'platformer',
+    desc: 'Susun balok jembatan di atas jurang luas tanpa terjatuh ke ladang duri bercahaya.',
+    targetLevel: 4, 
+    maxLevel: 10 
+  },
+  { 
+    id: 15, 
+    title: 'Menara Puncak Cinta Duo', 
+    mode: 'platformer', 
+    tag: 'Ujian Kerjasama', 
+    category: 'platformer',
+    desc: 'Naiki platform bergerak ke menara tertinggi dan kumpulkan kunci emas bersama pasangan.',
+    targetLevel: 5, 
+    maxLevel: 10 
+  },
+  { 
+    id: 16, 
+    title: 'Lava Rush: Lantai Membara', 
+    mode: 'platformer', 
+    tag: 'Survival Cepat', 
+    category: 'platformer',
+    desc: 'Jauhi lantai bawah tanah yang membara, bangun pijakan balok secepat mungkin ke atas.',
+    targetLevel: 6, 
+    maxLevel: 10 
+  },
+  { 
+    id: 17, 
+    title: 'Benteng Saklar Ganda & Kristal Es', 
+    mode: 'platformer', 
+    tag: 'Sinkronisasi Estafet', 
+    category: 'platformer',
+    desc: 'Tebing es licin dan dua gerbang laser dibuka bergantian oleh Bobi dan Bona secara estafet.',
+    targetLevel: 7, 
+    maxLevel: 10 
+  },
+  { 
+    id: 18, 
+    title: 'Menara Tiga Drone Pengawas', 
+    mode: 'platformer', 
+    tag: 'Hindaran Udara', 
+    category: 'platformer',
+    desc: 'Hindari tiga drone berkecepatan tinggi dengan bersembunyi di bawah platform balok.',
+    targetLevel: 8, 
+    maxLevel: 10 
+  },
+  { 
+    id: 19, 
+    title: 'Koridor Duri & Saklar Berantai', 
+    mode: 'platformer', 
+    tag: 'Sinkronisasi Cepat', 
+    category: 'platformer',
+    desc: 'Gerbang laser terbuka hanya sebentar setelah saklar dilepas, lari cepat bersama partner!',
+    targetLevel: 9, 
+    maxLevel: 10 
+  },
+  { 
+    id: 20, 
+    title: 'Ujian Puncak Pasangan Sejati', 
+    mode: 'platformer', 
+    tag: 'Tantangan Pamungkas', 
+    category: 'platformer',
+    desc: 'Ujian penutup pamungkas: gabungan semua rintangan laser, pegas, lendir, dan jurang berduri!',
+    targetLevel: 10, 
+    maxLevel: 10 
+  }
 ];
 
 if (typeof window !== 'undefined') {

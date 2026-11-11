@@ -1,442 +1,517 @@
 // Game Catalog Gameplay Preview & Animated Cuplikan Engine
 // Renders rich 2.5D gameplay illustrations and 60FPS live preview on hover!
+// Supports Space Shooter, Tank Battle, Pac-Man, Math Challenge, Pong, Snake, and Platformer.
 
 (function() {
   const PREVIEW_CONFIGS = {
-    1: { name: 'Slime Forest', bg: ['#0f172a', '#064e3b'], accent: '#10b981', obstacles: ['slime', 'key', 'door'], bobiAction: 'run', bonaAction: 'block' },
-    2: { name: 'Cliff Spring', bg: ['#0f172a', '#1e293b'], accent: '#f59e0b', obstacles: ['spring', 'drone', 'key'], bobiAction: 'spring_jump', bonaAction: 'run' },
-    3: { name: 'Laser Switch', bg: ['#1e1b4b', '#0f172a'], accent: '#8b5cf6', obstacles: ['switch', 'laser', 'key', 'door'], bobiAction: 'press_switch', bonaAction: 'run' },
-    4: { name: 'Nebula Chasm', bg: ['#030712', '#111827'], accent: '#06b6d4', obstacles: ['spikes', 'drone', 'block', 'key'], bobiAction: 'jump', bonaAction: 'place_bridge' },
-    5: { name: 'Love Tower', bg: ['#1e1b4b', '#3b0764'], accent: '#ff3b77', obstacles: ['moving_platform', 'key', 'door'], bobiAction: 'moving_lift', bonaAction: 'run' },
-    6: { name: 'Lava Rush', bg: ['#450a0a', '#180709'], accent: '#ef4444', obstacles: ['lava', 'spring', 'key'], bobiAction: 'spring_jump', bonaAction: 'run' },
-    7: { name: 'Dual Switch', bg: ['#172554', '#0f172a'], accent: '#3b82f6', obstacles: ['switch', 'laser', 'switch', 'door'], bobiAction: 'press_switch', bonaAction: 'run' },
-    8: { name: 'Crystal Ice', bg: ['#082f49', '#0c4a6e'], accent: '#38bdf8', obstacles: ['spikes', 'drone', 'key'], bobiAction: 'jump', bonaAction: 'place_bridge' },
-    9: { name: 'Triple Drone', bg: ['#1e1e24', '#0f172a'], accent: '#fbbf24', obstacles: ['drone', 'drone', 'key'], bobiAction: 'duck', bonaAction: 'run' },
-    10: { name: 'Grand Master', bg: ['#2e1065', '#172554'], accent: '#ec4899', obstacles: ['laser', 'drone', 'slime', 'door'], bobiAction: 'run', bonaAction: 'jump' },
-    11: { name: 'Bridge Collapse', bg: ['#1e293b', '#0f172a'], accent: '#00e5ff', obstacles: ['spikes', 'block', 'key'], bobiAction: 'jump', bonaAction: 'place_bridge' },
-    12: { name: 'Switch Chain', bg: ['#312e81', '#1e1b4b'], accent: '#a855f7', obstacles: ['switch', 'laser', 'door'], bobiAction: 'press_switch', bonaAction: 'run' },
-    13: { name: 'Double Slime', bg: ['#022c22', '#0f172a'], accent: '#10b981', obstacles: ['slime', 'slime', 'key'], bobiAction: 'stomp_slime', bonaAction: 'run' },
-    14: { name: 'Wind Cliff', bg: ['#0c4a6e', '#0369a1'], accent: '#38bdf8', obstacles: ['drone', 'spring', 'key'], bobiAction: 'spring_jump', bonaAction: 'run' },
-    15: { name: 'Moving Spikes', bg: ['#18181b', '#09090b'], accent: '#f43f5e', obstacles: ['moving_platform', 'spikes', 'key'], bobiAction: 'moving_lift', bonaAction: 'jump' },
-    16: { name: 'Twin Riddle', bg: ['#1e1b4b', '#3b0764'], accent: '#c084fc', obstacles: ['key', 'key', 'door'], bobiAction: 'run', bonaAction: 'run' },
-    17: { name: 'Multi Lift', bg: ['#0f172a', '#1e293b'], accent: '#eab308', obstacles: ['moving_platform', 'moving_platform', 'door'], bobiAction: 'moving_lift', bonaAction: 'jump' },
-    18: { name: 'Crystal Cave', bg: ['#164e63', '#083344'], accent: '#22d3ee', obstacles: ['spikes', 'block', 'key'], bobiAction: 'place_bridge', bonaAction: 'run' },
-    19: { name: 'Speed Laser', bg: ['#450a0a', '#1e1b4b'], accent: '#f43f5e', obstacles: ['laser', 'switch', 'door'], bobiAction: 'press_switch', bonaAction: 'run' },
-    20: { name: 'Eternal Glory', bg: ['#3b0764', '#0f172a'], accent: '#ffd700', obstacles: ['door', 'spring', 'drone'], bobiAction: 'spring_jump', bonaAction: 'jump' }
+    // 1. Shooter (Tembak-Tembakan)
+    1: { genre: 'shooter', name: 'Space Blaster', bg: ['#030712', '#0f172a'], accent: '#00e5ff' },
+    2: { genre: 'shooter', name: 'Laser Strike', bg: ['#0f051d', '#1e1b4b'], accent: '#a855f7' },
+
+    // 2. Tank (Tank-Tankan)
+    3: { genre: 'tank', name: 'Duo Tank Baja', bg: ['#090d16', '#1e293b'], accent: '#10b981' },
+    4: { genre: 'tank', name: 'Arena Tank Gurun', bg: ['#1c1917', '#292524'], accent: '#f59e0b' },
+
+    // 3. Pac-Man (Picman)
+    5: { genre: 'pacman', name: 'Duo Pac-Maze', bg: ['#020617', '#0f172a'], accent: '#ffd700' },
+    6: { genre: 'pacman', name: 'Pac-Man Neon', bg: ['#030712', '#172554'], accent: '#38bdf8' },
+
+    // 4. Math (Soal Matematika)
+    7: { genre: 'math', name: 'Kuis Matematika', bg: ['#0f172a', '#1e293b'], accent: '#00e5ff', q: '15 + 17 = ?', ans: '32', wrong1: '28', wrong2: '35' },
+    8: { genre: 'math', name: 'Duel Otak Cepat', bg: ['#1e1b4b', '#312e81'], accent: '#c084fc', q: '8 × 7 = ?', ans: '56', wrong1: '54', wrong2: '62' },
+
+    // 5. Pong & 6. Snake
+    9: { genre: 'pong', name: 'Neon Pong', bg: ['#020617', '#0f172a'], accent: '#00e5ff' },
+    10: { genre: 'snake', name: 'Duo Snake', bg: ['#022c22', '#064e3b'], accent: '#10b981' },
+
+    // 7. Platformers (Levels 1-10)
+    11: { genre: 'platformer', name: 'Slime Forest', bg: ['#0f172a', '#064e3b'], accent: '#10b981', obstacles: ['slime', 'key', 'door'] },
+    12: { genre: 'platformer', name: 'Cliff Spring', bg: ['#0f172a', '#1e293b'], accent: '#f59e0b', obstacles: ['spring', 'drone', 'key'] },
+    13: { genre: 'platformer', name: 'Laser Switch', bg: ['#1e1b4b', '#0f172a'], accent: '#8b5cf6', obstacles: ['switch', 'laser', 'key', 'door'] },
+    14: { genre: 'platformer', name: 'Nebula Chasm', bg: ['#030712', '#111827'], accent: '#06b6d4', obstacles: ['spikes', 'drone', 'block', 'key'] },
+    15: { genre: 'platformer', name: 'Love Tower', bg: ['#1e1b4b', '#3b0764'], accent: '#ff3b77', obstacles: ['moving_platform', 'key', 'door'] },
+    16: { genre: 'platformer', name: 'Lava Rush', bg: ['#450a0a', '#180709'], accent: '#ef4444', obstacles: ['lava', 'spring', 'key'] },
+    17: { genre: 'platformer', name: 'Dual Switch', bg: ['#172554', '#0f172a'], accent: '#3b82f6', obstacles: ['switch', 'laser', 'switch', 'door'] },
+    18: { genre: 'platformer', name: 'Crystal Ice', bg: ['#082f49', '#0c4a6e'], accent: '#38bdf8', obstacles: ['spikes', 'drone', 'key'] },
+    19: { genre: 'platformer', name: 'Triple Drone', bg: ['#1e1e24', '#0f172a'], accent: '#fbbf24', obstacles: ['drone', 'drone', 'key'] },
+    20: { genre: 'platformer', name: 'Grand Master', bg: ['#2e1065', '#172554'], accent: '#ec4899', obstacles: ['laser', 'drone', 'slime', 'door'] }
   };
 
   const activeAnimations = {};
 
-  // Procedural 2.5D Drawer
+  // Master Drawer
   function drawGameplayScene(canvas, gameId, animTime = 0, isHovered = false) {
     const ctx = canvas.getContext('2d');
     const w = canvas.width;
     const h = canvas.height;
-    const cfg = PREVIEW_CONFIGS[gameId] || PREVIEW_CONFIGS[1];
+    const cfg = PREVIEW_CONFIGS[gameId] || PREVIEW_CONFIGS[11];
 
     ctx.clearRect(0, 0, w, h);
 
-    // 1. Background Gradient
+    if (cfg.genre === 'shooter') {
+      drawShooterPreview(ctx, w, h, animTime, isHovered, cfg);
+    } else if (cfg.genre === 'tank') {
+      drawTankPreview(ctx, w, h, animTime, isHovered, cfg);
+    } else if (cfg.genre === 'pacman') {
+      drawPacmanPreview(ctx, w, h, animTime, isHovered, cfg);
+    } else if (cfg.genre === 'math') {
+      drawMathPreview(ctx, w, h, animTime, isHovered, cfg);
+    } else if (cfg.genre === 'pong') {
+      drawPongPreview(ctx, w, h, animTime, isHovered, cfg);
+    } else if (cfg.genre === 'snake') {
+      drawSnakePreview(ctx, w, h, animTime, isHovered, cfg);
+    } else {
+      drawPlatformerPreview(ctx, w, h, animTime, isHovered, cfg);
+    }
+  }
+
+  // 1. SHOOTER PREVIEW (TEMBAK-TEMBAKAN)
+  function drawShooterPreview(ctx, w, h, animTime, isHovered, cfg) {
+    // Starfield Background
     const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
     bgGrad.addColorStop(0, cfg.bg[0]);
     bgGrad.addColorStop(1, cfg.bg[1]);
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
 
-    // Subtle Grid / Starfield in distance
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < w; x += 24) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
-      ctx.stroke();
-    }
-    for (let y = 0; y < h; y += 24) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-      ctx.stroke();
+    // Stars
+    ctx.fillStyle = '#fff';
+    for (let i = 0; i < 30; i++) {
+      const sx = (i * 37) % w;
+      const sy = (i * 29 + animTime * 60) % h;
+      ctx.fillRect(sx, sy, 1.5, 1.5);
     }
 
-    // Distant mountain silhouette
-    ctx.fillStyle = 'rgba(10, 15, 30, 0.55)';
+    // Alien Saucers
+    const alienX = w * 0.5 + Math.sin(animTime * 3) * 40;
+    const alienY = h * 0.28;
+    drawMiniAlien(ctx, alienX, alienY, animTime);
+    drawMiniAlien(ctx, alienX - 60, alienY + 12, animTime + 1);
+    drawMiniAlien(ctx, alienX + 60, alienY + 12, animTime + 2);
+
+    // Lasers Firing
+    if (isHovered || animTime > 0) {
+      const laserY = (h * 0.82 - (animTime * 280) % (h * 0.6));
+      ctx.save();
+      ctx.fillStyle = '#00e5ff';
+      ctx.shadowColor = '#00e5ff';
+      ctx.shadowBlur = 8;
+      ctx.fillRect(w * 0.35, laserY, 3, 14);
+      ctx.fillStyle = '#ff3b77';
+      ctx.shadowColor = '#ff3b77';
+      ctx.fillRect(w * 0.65, (laserY + 20) % (h * 0.6) + h * 0.25, 3, 14);
+
+      // Hit effect
+      if (Math.abs(laserY - alienY) < 15) {
+        ctx.fillStyle = '#ffd700';
+        ctx.beginPath();
+        ctx.arc(alienX, alienY, 12, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // Player Spaceships
+    const shipSway = Math.sin(animTime * 4) * 12;
+    drawMiniShip(ctx, w * 0.35 + shipSway, h * 0.82, '#00e5ff', animTime);
+    drawMiniShip(ctx, w * 0.65 - shipSway, h * 0.82, '#ff3b77', animTime);
+  }
+
+  function drawMiniAlien(ctx, x, y, animTime) {
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Dome
+    ctx.fillStyle = '#00e5ff';
     ctx.beginPath();
-    ctx.moveTo(0, h);
-    ctx.lineTo(0, h * 0.65);
-    ctx.lineTo(w * 0.28, h * 0.42);
-    ctx.lineTo(w * 0.55, h * 0.58);
-    ctx.lineTo(w * 0.82, h * 0.38);
-    ctx.lineTo(w, h * 0.55);
-    ctx.lineTo(w, h);
-    ctx.closePath();
+    ctx.arc(0, -3, 6, Math.PI, 0);
     ctx.fill();
 
-    // 2. Platforms Setup (Multi-Tier 2.5D)
-    // Left Base Platform
-    drawPlatform(ctx, 0, h * 0.72, w * 0.38, h * 0.28, '#00e5ff');
-    // Middle Platform
-    drawPlatform(ctx, w * 0.44, h * 0.62, w * 0.24, h * 0.38, cfg.accent);
-    // Right Goal Platform
-    drawPlatform(ctx, w * 0.74, h * 0.48, w * 0.26, h * 0.52, '#ff3b77');
-
-    // Moving Platform (if applicable)
-    if (cfg.obstacles.includes('moving_platform')) {
-      const moveOffset = Math.sin(animTime * 2) * 18;
-      drawPlatform(ctx, w * 0.36 + moveOffset, h * 0.46, w * 0.16, 10, '#ffd700', true);
-    }
-
-    // Spikes / Lava at bottom
-    if (cfg.obstacles.includes('lava')) {
-      drawLavaHazard(ctx, w * 0.38, h * 0.85, w * 0.36, h * 0.15, animTime);
-    } else if (cfg.obstacles.includes('spikes')) {
-      drawSpikesHazard(ctx, w * 0.38, h * 0.88, w * 0.36, 16);
-    }
-
-    // 3. Game Hazards & Gadgets
-    // Laser Barrier & Switch
-    if (cfg.obstacles.includes('laser')) {
-      const laserActive = !cfg.obstacles.includes('switch') || (Math.sin(animTime * 1.5) > 0.2);
-      drawLaserBarrier(ctx, w * 0.68, h * 0.15, 12, h * 0.55, laserActive, animTime);
-    }
-    if (cfg.obstacles.includes('switch')) {
-      const isPressed = Math.sin(animTime * 1.5) <= 0.2;
-      drawSwitch(ctx, w * 0.49, h * 0.62, isPressed);
-    }
-
-    // Trampoline Spring
-    if (cfg.obstacles.includes('spring')) {
-      const springBounce = isHovered && (Math.sin(animTime * 4) > 0.7);
-      drawTrampoline(ctx, w * 0.28, h * 0.72, springBounce);
-    }
-
-    // Slime Monster
-    if (cfg.obstacles.includes('slime')) {
-      const slimeX = w * 0.48 + Math.sin(animTime * 2.5) * 18;
-      drawSlime(ctx, slimeX, h * 0.62, animTime);
-    }
-
-    // Flying Drone
-    if (cfg.obstacles.includes('drone')) {
-      const droneX = w * 0.56 + Math.cos(animTime * 2) * 22;
-      const droneY = h * 0.24 + Math.sin(animTime * 3) * 10;
-      drawDrone(ctx, droneX, droneY, animTime);
-    }
-
-    // Golden Key
-    if (cfg.obstacles.includes('key')) {
-      const keyY = h * 0.34 + Math.sin(animTime * 3) * 6;
-      drawGoldenKey(ctx, w * 0.56, keyY, animTime);
-    }
-
-    // Heart Door
-    if (cfg.obstacles.includes('door')) {
-      drawGoalDoor(ctx, w * 0.84, h * 0.48, animTime);
-    }
-
-    // 4. Draw Characters (Bobi & Bona)
-    // Bobi (Player 1 - Cyan)
-    let bobiX = w * 0.12;
-    let bobiY = h * 0.72;
-    let bobiJump = false;
-
-    if (isHovered) {
-      if (cfg.bobiAction === 'spring_jump') {
-        const cycle = (animTime * 2) % (Math.PI * 2);
-        bobiX = w * 0.15 + Math.sin(cycle) * 28;
-        bobiY = h * 0.72 - Math.max(0, Math.sin(cycle)) * 46;
-        bobiJump = Math.sin(cycle) > 0.1;
-      } else {
-        bobiX = w * 0.14 + Math.sin(animTime * 3) * 20;
-        bobiY = h * 0.72 - Math.abs(Math.sin(animTime * 6)) * 12;
-        bobiJump = Math.abs(Math.sin(animTime * 6)) > 0.3;
-      }
-    }
-    drawCharacter(ctx, bobiX, bobiY, '#00e5ff', 'bobi', bobiJump, animTime);
-
-    // Bona (Player 2 - Magenta)
-    let bonaX = w * 0.24;
-    let bonaY = h * 0.72;
-    let bonaJump = false;
-
-    if (isHovered) {
-      bonaX = w * 0.24 + Math.cos(animTime * 2.8) * 16;
-      bonaY = h * 0.72 - Math.abs(Math.cos(animTime * 5.6)) * 10;
-      bonaJump = Math.abs(Math.cos(animTime * 5.6)) > 0.3;
-    }
-    drawCharacter(ctx, bonaX, bonaY, '#ff3b77', 'bona', bonaJump, animTime);
-
-    // Bridge Blocks (if applicable)
-    if (cfg.bonaAction === 'place_bridge') {
-      drawPlacedBlock(ctx, w * 0.38, h * 0.72 - 16, '#ff3b77', animTime);
-    }
-
-    // 5. Overlay Polish & Vignette
-    // Top-to-bottom subtle border glow
-    ctx.strokeStyle = isHovered ? 'rgba(0, 229, 255, 0.65)' : 'rgba(255, 255, 255, 0.12)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, w - 2, h - 2);
-
-    // Bottom soft shadow for text contrast
-    const botGrad = ctx.createLinearGradient(0, h * 0.75, 0, h);
-    botGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    botGrad.addColorStop(1, 'rgba(10, 15, 30, 0.85)');
-    ctx.fillStyle = botGrad;
-    ctx.fillRect(0, h * 0.75, w, h * 0.25);
+    // Saucer Disk
+    ctx.fillStyle = '#10b981';
+    ctx.shadowColor = '#10b981';
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 14, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
-  // --- Helpers for Geometry & Assets ---
-  function drawPlatform(ctx, x, y, w, h, neonColor, isMoving = false) {
-    ctx.fillStyle = '#111827';
-    ctx.fillRect(x, y, w, h);
-
-    // Neon edge highlight
-    ctx.fillStyle = neonColor;
-    ctx.fillRect(x, y, w, 4);
-
-    // Subtle edge highlight
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.fillRect(x, y + 4, w, 2);
-
-    if (isMoving) {
-      // Glow under moving platform
-      ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
-      ctx.fillRect(x + 4, y + 6, w - 8, 4);
-    }
-  }
-
-  function drawCharacter(ctx, x, y, color, type, isJumping, animTime) {
-    const size = 22;
-    const drawY = y - size;
-
+  function drawMiniShip(ctx, x, y, color, animTime) {
     ctx.save();
-    ctx.translate(x, drawY);
+    ctx.translate(x, y);
+
+    // Thruster
+    ctx.fillStyle = '#ffd700';
+    ctx.beginPath();
+    ctx.moveTo(-4, 10);
+    ctx.lineTo(0, 16 + Math.random() * 4);
+    ctx.lineTo(4, 10);
+    ctx.closePath();
+    ctx.fill();
 
     // Body
     ctx.fillStyle = color;
     ctx.shadowColor = color;
     ctx.shadowBlur = 8;
     ctx.beginPath();
-    ctx.roundRect(0, 0, size, size, 5);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Face / Eyes
-    const blink = (Math.sin(animTime * 2.5) > 0.95);
-    ctx.fillStyle = '#000000';
-    if (blink) {
-      ctx.fillRect(5, 9, 4, 1.5);
-      ctx.fillRect(13, 9, 4, 1.5);
-    } else {
-      ctx.beginPath();
-      ctx.arc(7, 9, 2.2, 0, Math.PI * 2);
-      ctx.arc(15, 9, 2.2, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Eye catchlights
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(7.5, 8.5, 0.8, 0, Math.PI * 2);
-      ctx.arc(15.5, 8.5, 0.8, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Accessory: Bobi Cap vs Bona Bow
-    if (type === 'bobi') {
-      ctx.fillStyle = '#0284c7';
-      ctx.fillRect(2, -4, 18, 4);
-      ctx.fillRect(14, -2, 6, 2);
-    } else {
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(17, -2, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.restore();
-  }
-
-  function drawSlime(ctx, x, y, animTime) {
-    const squash = 1 + Math.sin(animTime * 6) * 0.15;
-    const w = 20 * squash;
-    const h = 16 / squash;
-
-    ctx.save();
-    ctx.translate(x, y - h);
-    ctx.fillStyle = '#a855f7';
-    ctx.shadowColor = '#a855f7';
-    ctx.shadowBlur = 6;
-    ctx.beginPath();
-    ctx.ellipse(w / 2, h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Slime Eye
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(w / 2, h / 2 - 1, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#000';
-    ctx.beginPath();
-    ctx.arc(w / 2 + 1, h / 2 - 1, 1.5, 0, Math.PI * 2);
+    ctx.moveTo(0, -12);
+    ctx.lineTo(10, 8);
+    ctx.lineTo(0, 5);
+    ctx.lineTo(-10, 8);
+    ctx.closePath();
     ctx.fill();
     ctx.restore();
   }
 
-  function drawDrone(ctx, x, y, animTime) {
+  // 2. TANK PREVIEW (TANK-TANKAN)
+  function drawTankPreview(ctx, w, h, animTime, isHovered, cfg) {
+    // Floor
+    ctx.fillStyle = '#0b1120';
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < w; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+    for (let y = 0; y < h; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+    // Brick Obstacles in Center
+    ctx.fillStyle = '#b45309';
+    for (let i = 0; i < 4; i++) {
+      ctx.fillRect(w * 0.48 - 8, h * 0.3 + i * 16, 16, 12);
+    }
+
+    // Bobi Tank (Left)
+    const tankMove = Math.sin(animTime * 2) * 15;
+    drawMiniTank(ctx, w * 0.22 + tankMove, h * 0.65, 0, '#00e5ff');
+
+    // Bona Tank (Bottom Left)
+    drawMiniTank(ctx, w * 0.22 - tankMove, h * 0.35, 0, '#ff3b77');
+
+    // Enemy Tank (Right)
+    drawMiniTank(ctx, w * 0.78, h * 0.5, Math.PI, '#ef4444');
+
+    // Cannon Shell
+    if (isHovered || animTime > 0) {
+      const shellX = w * 0.28 + ((animTime * 200) % (w * 0.5));
+      ctx.fillStyle = '#ffd700';
+      ctx.shadowColor = '#f59e0b';
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.arc(shellX, h * 0.65, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Blast hit
+      if (shellX > w * 0.45 && shellX < w * 0.52) {
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(w * 0.48, h * 0.65, 10, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawMiniTank(ctx, x, y, angle, color) {
     ctx.save();
     ctx.translate(x, y);
+    ctx.rotate(angle);
 
-    // Propeller spinning
-    const propW = 20 * Math.cos(animTime * 20);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(-propW / 2, -6);
-    ctx.lineTo(propW / 2, -6);
-    ctx.stroke();
+    // Treads
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(-12, -10, 24, 5);
+    ctx.fillRect(-12, 5, 24, 5);
 
-    // Body
-    ctx.fillStyle = '#334155';
-    ctx.beginPath();
-    ctx.roundRect(-10, -5, 20, 12, 4);
-    ctx.fill();
+    // Hull
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 6;
+    ctx.fillRect(-10, -6, 20, 12);
 
-    // Glowing Scanner Eye
-    ctx.fillStyle = '#ef4444';
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 8;
-    ctx.beginPath();
-    ctx.arc(0, 1, 3.5, 0, Math.PI * 2);
-    ctx.fill();
+    // Barrel
+    ctx.fillStyle = '#64748b';
+    ctx.fillRect(0, -2, 16, 4);
 
-    // Thruster sparks
-    ctx.fillStyle = '#38bdf8';
-    ctx.fillRect(-2, 7, 4, 3 + Math.sin(animTime * 15) * 2);
     ctx.restore();
   }
 
-  function drawLaserBarrier(ctx, x, y, w, h, active, animTime) {
-    ctx.fillStyle = '#475569';
-    ctx.fillRect(x, y, w, 8);
-    ctx.fillRect(x, y + h - 8, w, 8);
+  // 3. PAC-MAN PREVIEW (PICMAN)
+  function drawPacmanPreview(ctx, w, h, animTime, isHovered, cfg) {
+    ctx.fillStyle = '#060a16';
+    ctx.fillRect(0, 0, w, h);
 
-    if (active) {
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.75)';
-      ctx.shadowColor = '#ef4444';
-      ctx.shadowBlur = 12;
-      ctx.fillRect(x + 2, y + 8, w - 4, h - 16);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(x + 4, y + 8, w - 8, h - 16);
-      ctx.shadowBlur = 0;
+    // Maze Corridors
+    ctx.strokeStyle = '#1d4ed8';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(20, 16, w - 40, h - 32);
+    ctx.strokeRect(w * 0.38, h * 0.32, w * 0.24, h * 0.36);
+
+    // Dots
+    ctx.fillStyle = '#fde047';
+    for (let x = 40; x < w - 40; x += 22) {
+      ctx.beginPath();
+      ctx.arc(x, h * 0.22, 2.5, 0, Math.PI * 2);
+      ctx.arc(x, h * 0.78, 2.5, 0, Math.PI * 2);
+      ctx.fill();
     }
-  }
 
-  function drawSwitch(ctx, x, y, isPressed) {
-    ctx.fillStyle = '#475569';
-    ctx.fillRect(x - 12, y - 4, 24, 4);
-
-    ctx.fillStyle = isPressed ? '#22c55e' : '#f59e0b';
-    ctx.shadowColor = ctx.fillStyle;
-    ctx.shadowBlur = 6;
-    const btnHeight = isPressed ? 2 : 6;
-    ctx.fillRect(x - 9, y - 4 - btnHeight, 18, btnHeight);
-    ctx.shadowBlur = 0;
-  }
-
-  function drawTrampoline(ctx, x, y, isBouncing) {
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(x, y - 4, 22, 4);
-
-    ctx.fillStyle = isBouncing ? '#00e5ff' : '#f59e0b';
-    ctx.shadowColor = ctx.fillStyle;
-    ctx.shadowBlur = 6;
-    ctx.fillRect(x + 2, y - 8, 18, 4);
-    ctx.shadowBlur = 0;
-  }
-
-  function drawGoldenKey(ctx, x, y, animTime) {
-    ctx.save();
-    ctx.translate(x, y);
+    // Power Pellet
     ctx.fillStyle = '#ffd700';
     ctx.shadowColor = '#ffd700';
-    ctx.shadowBlur = 10;
+    ctx.shadowBlur = 8;
     ctx.beginPath();
-    ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
+    ctx.arc(38, h * 0.22, 6, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillRect(0, -1.5, 8, 3);
-    ctx.fillRect(5, 1, 2.5, 3.5);
-    ctx.restore();
+
+    // Pac-Mascot Bobi eating dots
+    const pacX = 50 + (animTime * 80) % (w - 120);
+    const mouth = 0.25 * Math.abs(Math.sin(animTime * 10));
+    ctx.fillStyle = '#00e5ff';
+    ctx.shadowColor = '#00e5ff';
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(pacX, h * 0.22, 10, mouth * Math.PI, (2 - mouth) * Math.PI);
+    ctx.lineTo(pacX, h * 0.22);
+    ctx.closePath();
+    ctx.fill();
+
+    // Ghost Blinky chasing
+    ctx.fillStyle = '#ef4444';
+    ctx.shadowColor = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(pacX - 45, h * 0.22, 9, Math.PI, 0);
+    ctx.lineTo(pacX - 36, h * 0.22 + 9);
+    ctx.lineTo(pacX - 45, h * 0.22 + 6);
+    ctx.lineTo(pacX - 54, h * 0.22 + 9);
+    ctx.closePath();
+    ctx.fill();
   }
 
-  function drawGoalDoor(ctx, x, y, animTime) {
-    ctx.fillStyle = '#1e1b4b';
+  // 4. MATH PREVIEW (SOAL MATEMATIKA)
+  function drawMathPreview(ctx, w, h, animTime, isHovered, cfg) {
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, w, h);
+
+    // Floor
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(0, h * 0.76, w, h * 0.24);
     ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, h * 0.76, w, 2);
+
+    // Chalkboard Display
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 2;
     ctx.shadowColor = '#00e5ff';
     ctx.shadowBlur = 10;
     ctx.beginPath();
-    ctx.roundRect(x, y - 36, 24, 36, [6, 6, 0, 0]);
+    ctx.roundRect(w * 0.25, 12, w * 0.5, 42, 8);
     ctx.fill();
     ctx.stroke();
 
-    // Heart icon inside door
+    ctx.font = '800 16px Outfit, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(cfg.q || '15 + 17 = ?', w * 0.5, 38);
+
+    // 3 Answer Portals
+    const portals = [
+      { x: w * 0.25, val: cfg.wrong1 || '28', correct: false },
+      { x: w * 0.5, val: cfg.ans || '32', correct: true },
+      { x: w * 0.75, val: cfg.wrong2 || '35', correct: false }
+    ];
+
+    for (const p of portals) {
+      const isCorrectP = p.correct && (isHovered || animTime > 0.5);
+      ctx.fillStyle = isCorrectP ? 'rgba(16, 185, 129, 0.3)' : '#1e293b';
+      ctx.strokeStyle = isCorrectP ? '#10b981' : '#00e5ff';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = isCorrectP ? '#10b981' : '#00e5ff';
+      ctx.shadowBlur = isCorrectP ? 12 : 6;
+      ctx.beginPath();
+      ctx.roundRect(p.x - 24, h * 0.74 - 16, 48, 20, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = '800 12px Outfit, sans-serif';
+      ctx.fillStyle = isCorrectP ? '#10b981' : '#ffd700';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.val, p.x, h * 0.74 - 2);
+    }
+
+    // Bobi jumping to correct answer
+    const jumpY = Math.sin(animTime * 5) < 0 ? Math.sin(animTime * 5) * 20 : 0;
+    drawMiniMascot(ctx, w * 0.5, h * 0.74 - 26 + jumpY, 'bobi');
+
+    if (isHovered || animTime > 0.8) {
+      ctx.font = '800 12px Outfit, sans-serif';
+      ctx.fillStyle = '#10b981';
+      ctx.fillText('BENAR! +250', w * 0.5, h * 0.74 - 45);
+    }
+  }
+
+  // 5. PONG PREVIEW
+  function drawPongPreview(ctx, w, h, animTime, isHovered, cfg) {
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(0, 0, w, h);
+
+    // Center Line
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(w * 0.5, 0); ctx.lineTo(w * 0.5, h); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Paddles
+    const padY1 = h * 0.5 + Math.sin(animTime * 4) * 30;
+    const padY2 = h * 0.5 - Math.sin(animTime * 4) * 30;
+    ctx.fillStyle = '#00e5ff';
+    ctx.shadowColor = '#00e5ff';
+    ctx.shadowBlur = 8;
+    ctx.fillRect(16, padY1 - 16, 6, 32);
+
     ctx.fillStyle = '#ff3b77';
+    ctx.shadowColor = '#ff3b77';
+    ctx.fillRect(w - 22, padY2 - 16, 6, 32);
+
+    // Ball
+    const ballX = w * 0.5 + Math.cos(animTime * 5) * (w * 0.4);
+    const ballY = h * 0.5 + Math.sin(animTime * 5) * (h * 0.3);
+    ctx.fillStyle = '#ffd700';
+    ctx.shadowColor = '#ffd700';
+    ctx.beginPath(); ctx.arc(ballX, ballY, 5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 6. SNAKE PREVIEW
+  function drawSnakePreview(ctx, w, h, animTime, isHovered, cfg) {
+    ctx.fillStyle = '#022c22';
+    ctx.fillRect(0, 0, w, h);
+
+    // Glowing Star Fruit
+    ctx.fillStyle = '#ffd700';
+    ctx.shadowColor = '#ffd700';
+    ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(w * 0.6, h * 0.45, 6, 0, Math.PI * 2); ctx.fill();
+
+    // Snake Body
+    for (let i = 0; i < 7; i++) {
+      const sx = w * 0.25 + (animTime * 60 - i * 14) % (w * 0.6);
+      const sy = h * 0.55 + Math.sin(animTime * 4 + i * 0.3) * 12;
+      ctx.fillStyle = i === 0 ? '#38bdf8' : '#10b981';
+      ctx.beginPath(); ctx.arc(sx, sy, 5.5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // 7. PLATFORMER PREVIEW (ORIGINAL CO-OP DUO QUEST)
+  function drawPlatformerPreview(ctx, w, h, animTime, isHovered, cfg) {
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+    bgGrad.addColorStop(0, cfg.bg[0]);
+    bgGrad.addColorStop(1, cfg.bg[1]);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Platforms
+    drawPlatform(ctx, 0, h * 0.72, w * 0.38, h * 0.28, '#00e5ff');
+    drawPlatform(ctx, w * 0.44, h * 0.62, w * 0.24, h * 0.38, cfg.accent);
+    drawPlatform(ctx, w * 0.74, h * 0.48, w * 0.26, h * 0.52, '#ff3b77');
+
+    // Trampoline
+    if (cfg.obstacles && cfg.obstacles.includes('spring')) {
+      const springBounce = isHovered && (Math.sin(animTime * 4) > 0.7);
+      drawTrampoline(ctx, w * 0.28, h * 0.72, springBounce);
+    }
+
+    // Slime
+    if (cfg.obstacles && cfg.obstacles.includes('slime')) {
+      const slimeX = w * 0.48 + Math.sin(animTime * 2.5) * 18;
+      drawSlime(ctx, slimeX, h * 0.62, animTime);
+    }
+
+    // Drone
+    if (cfg.obstacles && cfg.obstacles.includes('drone')) {
+      const droneX = w * 0.58 + Math.sin(animTime * 2) * 25;
+      const droneY = h * 0.3 + Math.cos(animTime * 3) * 8;
+      drawDrone(ctx, droneX, droneY, animTime);
+    }
+
+    // Door & Key
+    drawHeartDoor(ctx, w * 0.85, h * 0.48, true);
+    drawKey(ctx, w * 0.55, h * 0.44 + Math.sin(animTime * 4) * 4);
+
+    // Characters
+    const jump = Math.sin(animTime * 4) < 0 ? Math.sin(animTime * 4) * 18 : 0;
+    drawMiniMascot(ctx, w * 0.16, h * 0.72 - 20 + jump, 'bobi');
+    drawMiniMascot(ctx, w * 0.24, h * 0.72 - 20, 'bona');
+  }
+
+  // --- Platformer Asset Helpers ---
+  function drawPlatform(ctx, x, y, w, h, accent, isMoving = false) {
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = accent;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 6;
+    ctx.fillRect(x, y, w, 3);
+    ctx.shadowBlur = 0;
+  }
+
+  function drawMiniMascot(ctx, x, y, type) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.fillStyle = type === 'bobi' ? '#00e5ff' : '#ff3b77';
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 6;
     ctx.beginPath();
-    ctx.arc(x + 8.5, y - 20, 3, 0, Math.PI * 2);
-    ctx.arc(x + 15.5, y - 20, 3, 0, Math.PI * 2);
+    ctx.roundRect(-10, -10, 20, 20, 4);
     ctx.fill();
+
+    // Eyes
+    ctx.fillStyle = '#000';
+    ctx.fillRect(-5, -3, 2, 4);
+    ctx.fillRect(3, -3, 2, 4);
+
+    ctx.restore();
+  }
+
+  function drawTrampoline(ctx, x, y, bounce) {
+    ctx.fillStyle = '#ffd700';
+    ctx.fillRect(x - 12, y - (bounce ? 2 : 4), 24, bounce ? 2 : 4);
+  }
+
+  function drawSlime(ctx, x, y, animTime) {
+    ctx.fillStyle = '#a855f7';
     ctx.beginPath();
-    ctx.moveTo(x + 5.5, y - 18.5);
-    ctx.lineTo(x + 18.5, y - 18.5);
-    ctx.lineTo(x + 12, y - 11);
+    ctx.arc(x, y - 6, 8, Math.PI, 0);
     ctx.closePath();
     ctx.fill();
-    ctx.shadowBlur = 0;
   }
 
-  function drawSpikesHazard(ctx, x, y, w, h) {
+  function drawDrone(ctx, x, y, animTime) {
     ctx.fillStyle = '#ef4444';
-    ctx.shadowColor = '#ef4444';
+    ctx.fillRect(x - 8, y - 4, 16, 8);
+    // Propeller
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x - 12, y - 8);
+    ctx.lineTo(x + 12, y - 8);
+    ctx.stroke();
+  }
+
+  function drawHeartDoor(ctx, x, y, isOpen) {
+    ctx.fillStyle = isOpen ? '#ff3b77' : '#1e293b';
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - 12, y - 36, 24, 36);
+  }
+
+  function drawKey(ctx, x, y) {
+    ctx.fillStyle = '#ffd700';
+    ctx.shadowColor = '#ffd700';
     ctx.shadowBlur = 6;
-    const spikeW = 8;
-    const count = Math.floor(w / spikeW);
-    for (let i = 0; i < count; i++) {
-      ctx.beginPath();
-      ctx.moveTo(x + i * spikeW, y + h);
-      ctx.lineTo(x + i * spikeW + spikeW / 2, y);
-      ctx.lineTo(x + (i + 1) * spikeW, y + h);
-      ctx.closePath();
-      ctx.fill();
-    }
-    ctx.shadowBlur = 0;
-  }
-
-  function drawLavaHazard(ctx, x, y, w, h, animTime) {
-    const lavaGrad = ctx.createLinearGradient(0, y, 0, y + h);
-    lavaGrad.addColorStop(0, '#f97316');
-    lavaGrad.addColorStop(1, '#7f1d1d');
-    ctx.fillStyle = lavaGrad;
-    ctx.fillRect(x, y, w, h);
-
-    // Glowing bubbling ripples
-    ctx.fillStyle = '#fef08a';
-    for (let i = 0; i < 4; i++) {
-      const rx = x + ((i * 30 + animTime * 15) % w);
-      ctx.beginPath();
-      ctx.arc(rx, y + 2, 2.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  function drawPlacedBlock(ctx, x, y, color, animTime) {
-    ctx.fillStyle = color;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 8;
-    ctx.fillRect(x, y, 16, 16);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.fillRect(x + 2, y + 2, 12, 2);
-    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   // --- Manager API ---
@@ -485,23 +560,15 @@
           drawGameplayScene(canvas, gameId, 0, false);
         };
 
-        // Trigger on card hover
         card.addEventListener('mouseenter', startPreview);
         card.addEventListener('mouseleave', stopPreview);
 
-        // Also explicitly trigger on title hover (as requested by user)
         const titleEl = card.querySelector('.game-card-title');
-        if (titleEl) {
-          titleEl.addEventListener('mouseenter', startPreview);
-        }
+        if (titleEl) titleEl.addEventListener('mouseenter', startPreview);
 
-        // Also trigger on preview canvas container hover
         const previewBox = card.querySelector('.game-preview-container');
-        if (previewBox) {
-          previewBox.addEventListener('mouseenter', startPreview);
-        }
+        if (previewBox) previewBox.addEventListener('mouseenter', startPreview);
 
-        // Also bind to mobile tap / touch
         card.addEventListener('touchstart', () => {
           startPreview();
           setTimeout(stopPreview, 4500);

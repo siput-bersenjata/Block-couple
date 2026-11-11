@@ -1315,17 +1315,25 @@ class NetworkManager {
     const hud = document.getElementById('gameHud');
     if (hud) hud.classList.remove('hidden');
 
-    // Initialize or load level
+    // Initialize or load game mode & level
     if (!this.game) {
       this.game = new window.GameEngine();
       this.game.setSlot(this.slot);
       this.game.myPlayer.name = this.username;
-      this.game.loadLevel(levelIndex, levelStart);
+      if (typeof this.game.loadGame === 'function') {
+        this.game.loadGame(gameId, levelIndex, levelStart);
+      } else {
+        this.game.loadLevel(levelIndex, levelStart);
+      }
       this.game.start();
     } else {
       this.game.setSlot(this.slot);
       this.game.myPlayer.name = this.username;
-      this.game.loadLevel(levelIndex, levelStart);
+      if (typeof this.game.loadGame === 'function') {
+        this.game.loadGame(gameId, levelIndex, levelStart);
+      } else {
+        this.game.loadLevel(levelIndex, levelStart);
+      }
     }
 
     if (this.partnerName && this.game.peerPlayer) {
