@@ -1106,6 +1106,12 @@
       }
     };
 
+    GameEngine.prototype.createCoinParticles = function(x, y, color = '#ffd700') {
+      if (typeof this.createSpawnSparks === 'function') {
+        this.createSpawnSparks(x, y, color);
+      }
+    };
+
     // ========================================================
     // 5. SNAKE MODE (DUO SNAKE: PEMBURU BINTANG ENERGI)
     // ========================================================
