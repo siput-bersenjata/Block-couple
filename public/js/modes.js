@@ -1,7 +1,7 @@
 // Block Couple - Multi-Genre Co-op Game Engine Modes
 // Extends GameEngine with Shooter, Tank, Pacman, Math, Pong, and Snake modes!
 
-(function() {
+(function () {
   if (typeof window === 'undefined') return;
 
   function drawRoundRect(ctx, x, y, w, h, r = 4) {
@@ -26,7 +26,7 @@
     if (!GameEngine || !GameEngine.prototype) return;
 
     // --- Master Mode Switcher ---
-    GameEngine.prototype.loadGame = function(gameId, levelIndex = 0, startTime = Date.now(), restorePos = null) {
+    GameEngine.prototype.loadGame = function (gameId, levelIndex = 0, startTime = Date.now(), restorePos = null) {
       this.currentGameId = Number(gameId) || 1;
       const gameDef = (window.COOP_GAMES || []).find(g => Number(g.id) === this.currentGameId) || window.COOP_GAMES[0];
       this.gameMode = gameDef ? (gameDef.mode || 'platformer') : 'platformer';
@@ -78,7 +78,7 @@
     };
 
     // Shared explosion particle generator
-    GameEngine.prototype.createExplosion = function(x, y, color = '#ffd700', count = 14) {
+    GameEngine.prototype.createExplosion = function (x, y, color = '#ffd700', count = 14) {
       if (!this.particles) this.particles = [];
       const n = count || 14;
       for (let i = 0; i < n; i++) {
@@ -103,12 +103,12 @@
           } else if (typeof window.audioManager.playEnemyDefeat === 'function') {
             window.audioManager.playEnemyDefeat();
           }
-        } catch(e) {}
+        } catch (e) { }
       }
     };
 
     // Update Touch Controls & HUD text for each mode
-    GameEngine.prototype.updateModeControls = function() {
+    GameEngine.prototype.updateModeControls = function () {
       const btnJump = document.getElementById('btnJump');
       const btnPlace = document.getElementById('btnPlace');
       const btnClear = document.getElementById('btnClear');
@@ -168,7 +168,7 @@
     // ========================================================
     // 1. SHOOTER MODE (SPACE BLASTER & ALIEN INVASION)
     // ========================================================
-    GameEngine.prototype.initShooterMode = function(levelIndex) {
+    GameEngine.prototype.initShooterMode = function (levelIndex) {
       this.camera.x = 0;
       this.camera.y = 0;
       this.camera.targetX = 0;
@@ -211,7 +211,7 @@
       this.addFloatingText(480, 260, (this.gameTitle || 'DUO SPACE BLASTER').toUpperCase(), '#00e5ff', 28);
     };
 
-    GameEngine.prototype.spawnAlienWave = function() {
+    GameEngine.prototype.spawnAlienWave = function () {
       this.shooter.aliens = [];
       const rows = 3;
       const cols = 7;
@@ -235,7 +235,7 @@
       }
     };
 
-    GameEngine.prototype.updateShooter = function(dt) {
+    GameEngine.prototype.updateShooter = function (dt) {
       const s = this.shooter;
       if (!s) return;
 
@@ -269,7 +269,7 @@
           try {
             if (typeof window.audioManager.playLaser === 'function') window.audioManager.playLaser();
             else if (typeof window.audioManager.playJump === 'function') window.audioManager.playJump();
-          } catch(e) {}
+          } catch (e) { }
         }
       }
 
@@ -292,7 +292,7 @@
               s.score += 100;
               this.addFloatingText(a.x, a.y - 10, '+100', '#ffd700', 18);
               if (window.audioManager && typeof window.audioManager.playEnemyDefeat === 'function') {
-                try { window.audioManager.playEnemyDefeat(); } catch(e) {}
+                try { window.audioManager.playEnemyDefeat(); } catch (e) { }
               }
             } else {
               this.createExplosion(a.x, a.y, '#ffd700', 6);
@@ -341,7 +341,7 @@
         this.addFloatingText(480, 240, 'WAVE BERSIH! +500 PTS', '#00e5ff', 32);
         s.score += 500;
         if (window.audioManager && typeof window.audioManager.playDoorOpen === 'function') {
-          try { window.audioManager.playDoorOpen(); } catch(e) {}
+          try { window.audioManager.playDoorOpen(); } catch (e) { }
         }
       }
 
@@ -359,7 +359,7 @@
       this.updateParticles(dt);
     };
 
-    GameEngine.prototype.renderShooter = function() {
+    GameEngine.prototype.renderShooter = function () {
       const ctx = this.ctx;
       const s = this.shooter;
 
@@ -422,7 +422,7 @@
       ctx.restore();
     };
 
-    GameEngine.prototype.drawSpaceShip = function(ctx, x, y, type) {
+    GameEngine.prototype.drawSpaceShip = function (ctx, x, y, type) {
       ctx.save();
       ctx.translate(x, y);
 
@@ -469,7 +469,7 @@
       ctx.restore();
     };
 
-    GameEngine.prototype.drawAlienSaucer = function(ctx, x, y, type, hp) {
+    GameEngine.prototype.drawAlienSaucer = function (ctx, x, y, type, hp) {
       ctx.save();
       ctx.translate(x, y);
 
@@ -508,9 +508,9 @@
     };
 
     // ========================================================
-    // 2. TANK BATTLE MODE (DUO TANK BAJA 2D)
+    // 2. TANK BATTLE MODE (DUO TANK BAJA 2D WITH ADAPTIVE AI)
     // ========================================================
-    GameEngine.prototype.initTankMode = function(levelIndex) {
+    GameEngine.prototype.initTankMode = function (levelIndex) {
       this.camera.x = 0;
       this.camera.y = 0;
       this.camera.targetX = 0;
@@ -520,16 +520,29 @@
       this.myPlayer.x = this.localSlot === 1 ? 120 : 120;
       this.myPlayer.y = this.localSlot === 1 ? 200 : 340;
       this.myPlayer.angle = 0; // facing right
+      this.myPlayer.hurtTimer = 0;
       this.peerPlayer.x = this.localSlot === 1 ? 120 : 120;
       this.peerPlayer.y = this.localSlot === 1 ? 340 : 200;
       this.peerPlayer.angle = 0;
+      this.peerPlayer.hurtTimer = 0;
+
+      const level = Math.max(1, Math.min(10, (levelIndex || 0) + 1));
+      this.tankLevelIndex = levelIndex || 0;
+      const difficultyNames = [
+        'Mudah', 'Normal', 'Siaga', 'Tangguh', 'Sulit',
+        'Pakar', 'Komandan', 'Master', 'Ekstrim', 'Neraka Baja'
+      ];
+      const diffName = difficultyNames[level - 1] || 'Normal';
 
       this.tank = {
-        score: 0,
+        level: level,
+        diffName: diffName,
+        score: (this.tank && this.tank.score) || 0,
         shells: [],
         cooldown: 0,
         bricks: [],
-        enemyTanks: []
+        enemyTanks: [],
+        cleared: false
       };
 
       // Generate Destructible Brick Barriers
@@ -549,18 +562,109 @@
         }
       }
 
-      // Spawn Enemy Tanks
-      this.tank.enemyTanks.push(
-        { x: 800, y: 140, angle: Math.PI, vx: 0, vy: 50, shootTimer: 2 },
-        { x: 800, y: 400, angle: Math.PI, vx: 0, vy: -50, shootTimer: 3 }
-      );
+      // Generate Enemy Tanks based on chosen difficulty level
+      const enemyConfigs = [];
+      if (level === 1) {
+        enemyConfigs.push(
+          { x: 820, y: 150, type: 'standard', hp: 1, maxHp: 1, color: '#ef4444', speed: 80, shootInterval: 4.2 },
+          { x: 820, y: 390, type: 'standard', hp: 1, maxHp: 1, color: '#ef4444', speed: 80, shootInterval: 4.5 }
+        );
+      } else if (level === 2) {
+        enemyConfigs.push(
+          { x: 820, y: 140, type: 'standard', hp: 1, maxHp: 1, color: '#ef4444', speed: 95, shootInterval: 3.6 },
+          { x: 820, y: 400, type: 'standard', hp: 1, maxHp: 1, color: '#ef4444', speed: 95, shootInterval: 3.8 }
+        );
+      } else if (level === 3) {
+        enemyConfigs.push(
+          { x: 820, y: 120, type: 'standard', hp: 1, maxHp: 1, color: '#ef4444', speed: 105, shootInterval: 3.2 },
+          { x: 820, y: 420, type: 'standard', hp: 1, maxHp: 1, color: '#ef4444', speed: 105, shootInterval: 3.2 },
+          { x: 740, y: 270, type: 'scout', hp: 1, maxHp: 1, color: '#f97316', speed: 135, shootInterval: 2.8 }
+        );
+      } else if (level === 4) {
+        enemyConfigs.push(
+          { x: 820, y: 120, type: 'heavy', hp: 2, maxHp: 2, color: '#b91c1c', speed: 95, shootInterval: 2.6 },
+          { x: 820, y: 420, type: 'standard', hp: 1, maxHp: 1, color: '#ef4444', speed: 120, shootInterval: 2.8 },
+          { x: 740, y: 270, type: 'scout', hp: 1, maxHp: 1, color: '#f97316', speed: 145, shootInterval: 2.4 }
+        );
+      } else if (level === 5) {
+        enemyConfigs.push(
+          { x: 820, y: 100, type: 'heavy', hp: 2, maxHp: 2, color: '#b91c1c', speed: 105, shootInterval: 2.3 },
+          { x: 820, y: 440, type: 'heavy', hp: 2, maxHp: 2, color: '#b91c1c', speed: 105, shootInterval: 2.3 },
+          { x: 740, y: 200, type: 'scout', hp: 1, maxHp: 1, color: '#f97316', speed: 160, shootInterval: 2.0 },
+          { x: 740, y: 340, type: 'standard', hp: 1, maxHp: 1, color: '#ef4444', speed: 130, shootInterval: 2.2 }
+        );
+      } else if (level === 6) {
+        enemyConfigs.push(
+          { x: 820, y: 100, type: 'heavy', hp: 2, maxHp: 2, color: '#b91c1c', speed: 115, shootInterval: 2.0 },
+          { x: 820, y: 440, type: 'heavy', hp: 2, maxHp: 2, color: '#b91c1c', speed: 115, shootInterval: 2.0 },
+          { x: 740, y: 190, type: 'scout', hp: 1, maxHp: 1, color: '#f97316', speed: 170, shootInterval: 1.8 },
+          { x: 740, y: 350, type: 'scout', hp: 1, maxHp: 1, color: '#f97316', speed: 170, shootInterval: 1.8 }
+        );
+      } else if (level === 7) {
+        enemyConfigs.push(
+          { x: 840, y: 270, type: 'commander', hp: 3, maxHp: 3, color: '#7c3aed', speed: 125, shootInterval: 1.6 },
+          { x: 820, y: 110, type: 'heavy', hp: 2, maxHp: 2, color: '#b91c1c', speed: 120, shootInterval: 1.9 },
+          { x: 820, y: 430, type: 'heavy', hp: 2, maxHp: 2, color: '#b91c1c', speed: 120, shootInterval: 1.9 },
+          { x: 720, y: 270, type: 'scout', hp: 1, maxHp: 1, color: '#f97316', speed: 180, shootInterval: 1.6 }
+        );
+      } else if (level === 8) {
+        enemyConfigs.push(
+          { x: 840, y: 270, type: 'commander', hp: 3, maxHp: 3, color: '#7c3aed', speed: 135, shootInterval: 1.4 },
+          { x: 820, y: 100, type: 'heavy', hp: 2, maxHp: 2, color: '#b91c1c', speed: 125, shootInterval: 1.6 },
+          { x: 820, y: 440, type: 'heavy', hp: 2, maxHp: 2, color: '#b91c1c', speed: 125, shootInterval: 1.6 },
+          { x: 740, y: 180, type: 'scout', hp: 1, maxHp: 1, color: '#f97316', speed: 190, shootInterval: 1.4 },
+          { x: 740, y: 360, type: 'scout', hp: 1, maxHp: 1, color: '#f97316', speed: 190, shootInterval: 1.4 }
+        );
+      } else if (level === 9) {
+        enemyConfigs.push(
+          { x: 840, y: 200, type: 'commander', hp: 3, maxHp: 3, color: '#7c3aed', speed: 145, shootInterval: 1.2 },
+          { x: 840, y: 340, type: 'commander', hp: 3, maxHp: 3, color: '#7c3aed', speed: 145, shootInterval: 1.2 },
+          { x: 820, y: 90, type: 'heavy', hp: 2, maxHp: 2, color: '#b91c1c', speed: 135, shootInterval: 1.4 },
+          { x: 820, y: 450, type: 'heavy', hp: 2, maxHp: 2, color: '#b91c1c', speed: 135, shootInterval: 1.4 },
+          { x: 730, y: 270, type: 'scout', hp: 1, maxHp: 1, color: '#f97316', speed: 200, shootInterval: 1.2 }
+        );
+      } else {
+        // Level 10: Neraka Baja
+        enemyConfigs.push(
+          { x: 850, y: 270, type: 'titan', hp: 4, maxHp: 4, color: '#d946ef', speed: 160, shootInterval: 1.0 },
+          { x: 830, y: 120, type: 'commander', hp: 3, maxHp: 3, color: '#7c3aed', speed: 150, shootInterval: 1.1 },
+          { x: 830, y: 420, type: 'commander', hp: 3, maxHp: 3, color: '#7c3aed', speed: 150, shootInterval: 1.1 },
+          { x: 750, y: 100, type: 'heavy', hp: 2, maxHp: 2, color: '#b91c1c', speed: 140, shootInterval: 1.3 },
+          { x: 750, y: 440, type: 'heavy', hp: 2, maxHp: 2, color: '#b91c1c', speed: 140, shootInterval: 1.3 },
+          { x: 720, y: 270, type: 'scout', hp: 1, maxHp: 1, color: '#f97316', speed: 215, shootInterval: 1.0 }
+        );
+      }
 
-      this.addFloatingText(480, 260, (this.gameTitle || 'DUO TANK BAJA').toUpperCase(), '#00e5ff', 28);
+      for (const cfg of enemyConfigs) {
+        this.tank.enemyTanks.push({
+          x: cfg.x,
+          y: cfg.y,
+          angle: Math.PI, // Facing player (left)
+          vx: 0,
+          vy: 0,
+          speed: cfg.speed,
+          shootInterval: cfg.shootInterval,
+          shootCooldown: 1.5 + Math.random() * 2,
+          thinkTimer: Math.random() * 0.5,
+          type: cfg.type,
+          hp: cfg.hp,
+          maxHp: cfg.maxHp,
+          color: cfg.color
+        });
+      }
+
+      this.addFloatingText(480, 260, `DUO TANK: LEVEL ${level} (${diffName.toUpperCase()})`, '#00e5ff', 28);
     };
 
-    GameEngine.prototype.updateTank = function(dt) {
+    GameEngine.prototype.updateTank = function (dt) {
       const t = this.tank;
       if (!t) return;
+
+      const level = t.level || 1;
+
+      // Hurt timer countdown
+      if (this.myPlayer.hurtTimer > 0) this.myPlayer.hurtTimer -= dt;
+      if (this.peerPlayer.hurtTimer > 0) this.peerPlayer.hurtTimer -= dt;
 
       // Anti-stuck safety guard for tank: if ever caught inside a brick, relocate to base
       for (const b of t.bricks) {
@@ -607,6 +711,17 @@
         if (!blockedY) this.myPlayer.y = nextY;
       }
 
+      // Broadcast position and angle to peer via network
+      if (window.networkManager && typeof window.networkManager.emitPlayerUpdate === 'function') {
+        window.networkManager.emitPlayerUpdate({
+          x: this.myPlayer.x,
+          y: this.myPlayer.y,
+          angle: this.myPlayer.angle,
+          vx: vx * speed,
+          vy: vy * speed
+        });
+      }
+
       // Firing Cannon
       t.cooldown -= dt;
       const wantsFire = this.keysDown[' '] || this.touchState.jump;
@@ -619,13 +734,14 @@
           vx: Math.cos(ang) * 480,
           vy: Math.sin(ang) * 480,
           bounces: 1,
-          owner: this.localSlot
+          owner: this.localSlot,
+          color: '#ffd700'
         });
         if (window.audioManager) {
           try {
             if (typeof window.audioManager.playLaser === 'function') window.audioManager.playLaser();
             else if (typeof window.audioManager.playSpringBounce === 'function') window.audioManager.playSpringBounce();
-          } catch(e) {}
+          } catch (e) { }
         }
       }
 
@@ -638,11 +754,11 @@
         // Bounce on boundary
         if (s.x < 20 || s.x > 940) {
           s.vx = -s.vx;
-          s.bounces--;
+          s.bounces = (s.bounces || 0) - 1;
         }
         if (s.y < 20 || s.y > 520) {
           s.vy = -s.vy;
-          s.bounces--;
+          s.bounces = (s.bounces || 0) - 1;
         }
 
         // Hit Brick Walls
@@ -657,41 +773,181 @@
           }
         }
 
-        // Hit Enemy Tanks
-        for (let k = t.enemyTanks.length - 1; k >= 0; k--) {
-          const e = t.enemyTanks[k];
-          if (Math.abs(s.x - e.x) < 22 && Math.abs(s.y - e.y) < 22) {
-            hit = true;
-            this.createExplosion(e.x, e.y, '#ef4444', 25);
-            t.enemyTanks.splice(k, 1);
-            t.score += 250;
-            this.addFloatingText(e.x, e.y - 10, '+250 TANK HANCUR!', '#ffd700', 20);
-            if (window.audioManager && typeof window.audioManager.playEnemyDefeat === 'function') {
-              try { window.audioManager.playEnemyDefeat(); } catch(e) {}
+        // Hit Enemy Tanks (if player shell)
+        if (!hit && s.owner !== 'enemy') {
+          for (let k = t.enemyTanks.length - 1; k >= 0; k--) {
+            const e = t.enemyTanks[k];
+            if (Math.abs(s.x - e.x) < 22 && Math.abs(s.y - e.y) < 22) {
+              hit = true;
+              e.hp = (e.hp || 1) - 1;
+              if (e.hp <= 0) {
+                this.createExplosion(e.x, e.y, e.color || '#ef4444', 25);
+                t.enemyTanks.splice(k, 1);
+                const pts = (e.maxHp || 1) * 150 + 100;
+                t.score += pts;
+                this.addFloatingText(e.x, e.y - 12, `+${pts} TANK HANCUR!`, '#ffd700', 20);
+                if (window.audioManager && typeof window.audioManager.playEnemyDefeat === 'function') {
+                  try { window.audioManager.playEnemyDefeat(); } catch (e) { }
+                }
+
+                // Check victory / level clear
+                if (t.enemyTanks.length === 0 && !t.cleared) {
+                  t.cleared = true;
+                  t.score += 1000;
+                  this.addFloatingText(480, 260, `LEVEL ${level} SELESAI! +1000 PTS`, '#ffd700', 32);
+                  if (window.audioManager && typeof window.audioManager.playLevelComplete === 'function') {
+                    try { window.audioManager.playLevelComplete(); } catch (err) { }
+                  }
+                  setTimeout(() => {
+                    if (this.gameMode === 'tank') {
+                      this.initTankMode((this.tankLevelIndex || 0) + 1);
+                    }
+                  }, 2500);
+                }
+              } else {
+                this.createExplosion(s.x, s.y, '#f97316', 10);
+                this.addFloatingText(e.x, e.y - 12, `HIT! ${e.hp} HP`, '#fbbf24', 18);
+              }
+              break;
             }
-            break;
           }
         }
 
-        if (hit || s.bounces < 0) {
+        // Hit Player (if enemy shell)
+        if (!hit && s.owner === 'enemy') {
+          // Check local player
+          if (Math.hypot(s.x - this.myPlayer.x, s.y - this.myPlayer.y) < 22) {
+            hit = true;
+            if ((this.myPlayer.hurtTimer || 0) <= 0) {
+              this.myPlayer.hurtTimer = 2.0;
+              this.createExplosion(this.myPlayer.x, this.myPlayer.y, '#ef4444', 20);
+              this.addFloatingText(this.myPlayer.x, this.myPlayer.y - 15, 'TERTEMBAK MUSUH! -100', '#ef4444', 22);
+              t.score = Math.max(0, t.score - 100);
+              if (window.audioManager && typeof window.audioManager.playHurt === 'function') {
+                try { window.audioManager.playHurt(); } catch (err) { }
+              }
+              // Respawn to base
+              this.myPlayer.x = 120;
+              this.myPlayer.y = this.localSlot === 1 ? 200 : 340;
+            }
+          }
+
+          // Check peer player if connected
+          if (!hit && this.peerPlayer && this.peerPlayer.connected) {
+            if (Math.hypot(s.x - this.peerPlayer.x, s.y - this.peerPlayer.y) < 22) {
+              hit = true;
+              this.createExplosion(this.peerPlayer.x, this.peerPlayer.y, '#ef4444', 20);
+            }
+          }
+        }
+
+        if (hit || (s.bounces !== undefined && s.bounces < 0)) {
           t.shells.splice(i, 1);
         }
       }
 
-      // Update Enemy Tanks
-      for (const e of t.enemyTanks) {
-        let nextY = e.y + e.vy * dt;
-        let blocked = false;
-        for (const b of t.bricks) {
-          if (circleRectOverlap(e.x, nextY, 20, b.x, b.y, 20, 20)) {
-            blocked = true;
-            break;
-          }
+      // Update Enemy Tanks AI & Autonomous Movement
+      for (let k = 0; k < t.enemyTanks.length; k++) {
+        const e = t.enemyTanks[k];
+
+        // Target closest living player
+        let target = this.myPlayer;
+        if (this.peerPlayer && this.peerPlayer.connected) {
+          const d1 = Math.hypot(this.myPlayer.x - e.x, this.myPlayer.y - e.y);
+          const d2 = Math.hypot(this.peerPlayer.x - e.x, this.peerPlayer.y - e.y);
+          if (d2 < d1) target = this.peerPlayer;
         }
-        if (blocked || nextY < 70 || nextY > 470) {
-          e.vy = -e.vy;
-        } else {
-          e.y = nextY;
+
+        // AI Think Timer (decision making interval)
+        e.thinkTimer = (e.thinkTimer || 0) - dt;
+        if (e.thinkTimer <= 0) {
+          e.thinkTimer = 0.35 + Math.random() * Math.max(0.2, 0.65 - level * 0.04);
+
+          const dx = target.x - e.x;
+          const dy = target.y - e.y;
+          const dist = Math.hypot(dx, dy);
+
+          // Aim calculation with predictive lead aiming on higher levels
+          let aimAngle = Math.atan2(dy, dx);
+          if (level >= 5 && target.vx !== undefined) {
+            const leadTime = Math.min(0.45, dist / 500);
+            const predX = target.x + (target.vx || 0) * leadTime;
+            const predY = target.y + (target.vy || 0) * leadTime;
+            aimAngle = Math.atan2(predY - e.y, predX - e.x);
+          }
+          e.angle = aimAngle;
+
+          // Strategic Movement Behavior:
+          let desiredVx = 0;
+          let desiredVy = 0;
+
+          if (dist > 300) {
+            // Far away: Advance toward player
+            if (Math.abs(dx) > Math.abs(dy)) {
+              desiredVx = Math.sign(dx) * e.speed;
+              desiredVy = Math.random() > 0.6 ? Math.sign(dy) * e.speed * 0.5 : 0;
+            } else {
+              desiredVy = Math.sign(dy) * e.speed;
+              desiredVx = Math.random() > 0.6 ? Math.sign(dx) * e.speed * 0.5 : 0;
+            }
+          } else if (dist < 140) {
+            // Too close: Tactical back-up / retreat to maintain firing range
+            desiredVx = -Math.sign(dx) * e.speed * 0.75;
+            desiredVy = Math.random() > 0.5 ? e.speed * 0.75 : -e.speed * 0.75;
+          } else {
+            // Mid range: Strafe perpendicular to dodge incoming player shots
+            desiredVx = -Math.sin(aimAngle) * e.speed * 0.9;
+            desiredVy = Math.cos(aimAngle) * e.speed * 0.9;
+            if (Math.random() > 0.5) {
+              desiredVx = -desiredVx;
+              desiredVy = -desiredVy;
+            }
+          }
+
+          e.vx = desiredVx;
+          e.vy = desiredVy;
+        }
+
+        // Apply movement with solid brick & arena boundary collisions
+        let nextX = e.x + e.vx * dt;
+        let nextY = e.y + e.vy * dt;
+
+        nextX = Math.max(60, Math.min(900, nextX));
+        nextY = Math.max(60, Math.min(480, nextY));
+
+        let blockedX = false;
+        let blockedY = false;
+        for (const b of t.bricks) {
+          if (circleRectOverlap(nextX, e.y, 18, b.x, b.y, 20, 20)) blockedX = true;
+          if (circleRectOverlap(e.x, nextY, 18, b.x, b.y, 20, 20)) blockedY = true;
+        }
+
+        if (!blockedX) e.x = nextX; else e.vx = -e.vx;
+        if (!blockedY) e.y = nextY; else e.vy = -e.vy;
+
+        // Shooting AI: Fire cannon when ready and within range
+        e.shootCooldown = (e.shootCooldown || 2) - dt;
+        if (e.shootCooldown <= 0) {
+          const distToTarget = Math.hypot(target.x - e.x, target.y - e.y);
+          if (distToTarget < (650 + level * 35)) {
+            // Fire enemy cannon shell!
+            t.shells.push({
+              x: e.x + Math.cos(e.angle) * 24,
+              y: e.y + Math.sin(e.angle) * 24,
+              vx: Math.cos(e.angle) * (340 + level * 18),
+              vy: Math.sin(e.angle) * (340 + level * 18),
+              bounces: level >= 5 ? 1 : 0,
+              owner: 'enemy',
+              color: '#ef4444'
+            });
+            t.enemyFiredCount = (t.enemyFiredCount || 0) + 1;
+
+            if (window.audioManager && typeof window.audioManager.playLaser === 'function') {
+              try { window.audioManager.playLaser(); } catch (err) { }
+            }
+          }
+          // Reset cooldown with slight random variation
+          e.shootCooldown = e.shootInterval * (0.8 + Math.random() * 0.4);
         }
       }
 
@@ -699,7 +955,7 @@
       this.updateParticles(dt);
     };
 
-    GameEngine.prototype.renderTank = function() {
+    GameEngine.prototype.renderTank = function () {
       const ctx = this.ctx;
       const t = this.tank;
 
@@ -725,69 +981,124 @@
         ctx.strokeRect(b.x - 9, b.y - 9, b.w, b.h);
       }
 
-      // Cannon Shells
+      // Cannon Shells (Gold for player, Crimson for enemy)
       for (const s of t.shells) {
         ctx.save();
-        ctx.fillStyle = '#ffd700';
-        ctx.shadowColor = '#f59e0b';
-        ctx.shadowBlur = 8;
+        ctx.fillStyle = s.color || (s.owner === 'enemy' ? '#ef4444' : '#ffd700');
+        ctx.shadowColor = s.owner === 'enemy' ? '#ef4444' : '#f59e0b';
+        ctx.shadowBlur = s.owner === 'enemy' ? 12 : 8;
         ctx.beginPath();
-        ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
+        ctx.arc(s.x, s.y, s.owner === 'enemy' ? 5 : 4, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
 
-      // Render Player Tanks
-      this.drawTankSprite(ctx, this.myPlayer.x, this.myPlayer.y, this.myPlayer.angle || 0, this.localSlot === 1 ? '#00e5ff' : '#ff3b77');
+      // Render Player Tanks (with invulnerability flash if hurt)
+      if ((this.myPlayer.hurtTimer || 0) <= 0 || Math.floor(Date.now() / 100) % 2 === 0) {
+        this.drawTankSprite(ctx, this.myPlayer.x, this.myPlayer.y, this.myPlayer.angle || 0, this.localSlot === 1 ? '#00e5ff' : '#ff3b77');
+      }
       if (this.peerPlayer.connected) {
-        this.drawTankSprite(ctx, this.peerPlayer.x, this.peerPlayer.y, this.peerPlayer.angle || 0, this.localSlot === 1 ? '#ff3b77' : '#00e5ff');
+        if ((this.peerPlayer.hurtTimer || 0) <= 0 || Math.floor(Date.now() / 100) % 2 === 0) {
+          this.drawTankSprite(ctx, this.peerPlayer.x, this.peerPlayer.y, this.peerPlayer.angle || 0, this.localSlot === 1 ? '#ff3b77' : '#00e5ff');
+        }
       }
 
-      // Render Enemy Tanks
+      // Render Enemy Tanks with AI Sight Lines and Health Bars
       for (const e of t.enemyTanks) {
-        this.drawTankSprite(ctx, e.x, e.y, e.angle, '#ef4444');
+        // Red laser sight line when tank is about to fire (< 0.6s)
+        if (e.shootCooldown < 0.6) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(e.x, e.y);
+          ctx.lineTo(e.x + Math.cos(e.angle) * 320, e.y + Math.sin(e.angle) * 320);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Draw Tank Sprite
+        this.drawTankSprite(ctx, e.x, e.y, e.angle, e.color || '#ef4444', e.type);
+
+        // Draw HP bar above heavy/commander tanks
+        if (e.maxHp > 1) {
+          const barW = 28;
+          const barH = 4;
+          ctx.save();
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(e.x - barW / 2, e.y - 24, barW, barH);
+          ctx.fillStyle = e.hp > 1 ? '#22c55e' : '#ef4444';
+          ctx.fillRect(e.x - barW / 2, e.y - 24, (barW * e.hp) / e.maxHp, barH);
+          ctx.strokeStyle = '#64748b';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(e.x - barW / 2, e.y - 24, barW, barH);
+          ctx.restore();
+        }
       }
 
       this.renderParticles(ctx);
       this.renderFloatingTexts(ctx);
 
-      // HUD
+      // HUD Overlay with Difficulty Indicator
       ctx.save();
-      ctx.font = '700 16px Outfit, sans-serif';
+      ctx.font = '800 15px Outfit, sans-serif';
       ctx.fillStyle = '#00e5ff';
-      ctx.fillText(`TANK MUSUH: ${t.enemyTanks.length}`, 40, 40);
+      ctx.fillText(`TANK MUSUH: ${t.enemyTanks.length}`, 40, 36);
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.textAlign = 'center';
+      ctx.fillText(`TINGKAT: LEVEL ${t.level} (${(t.diffName || 'NORMAL').toUpperCase()})`, 480, 36);
+
       ctx.fillStyle = '#ffd700';
-      ctx.fillText(`SKOR: ${t.score}`, 840, 40);
+      ctx.textAlign = 'right';
+      ctx.fillText(`SKOR: ${t.score}`, 920, 36);
       ctx.restore();
     };
 
-    GameEngine.prototype.drawTankSprite = function(ctx, x, y, angle, color) {
+    GameEngine.prototype.drawTankSprite = function (ctx, x, y, angle, color, type = 'standard') {
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(angle);
 
+      // Special Titan / Commander glowing aura
+      if (type === 'titan' || type === 'commander') {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 14;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, 24, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       // Treads
+      const treadWidth = type === 'titan' ? 40 : 36;
       ctx.fillStyle = '#1e293b';
-      ctx.fillRect(-18, -16, 36, 8);
-      ctx.fillRect(-18, 8, 36, 8);
+      ctx.fillRect(-treadWidth / 2, -16, treadWidth, 8);
+      ctx.fillRect(-treadWidth / 2, 8, treadWidth, 8);
 
       // Hull
       ctx.fillStyle = color;
       ctx.shadowColor = color;
       ctx.shadowBlur = 8;
       ctx.beginPath();
-      drawRoundRect(ctx, -14, -10, 28, 20, 4);
+      const hullW = type === 'scout' ? 24 : (type === 'titan' ? 32 : 28);
+      drawRoundRect(ctx, -hullW / 2, -10, hullW, 20, 4);
       ctx.fill();
 
       // Cannon Turret
       ctx.fillStyle = '#0f172a';
       ctx.beginPath();
-      ctx.arc(0, 0, 8, 0, Math.PI * 2);
+      ctx.arc(0, 0, type === 'titan' ? 10 : 8, 0, Math.PI * 2);
       ctx.fill();
 
       // Cannon Barrel
+      const barrelLen = type === 'scout' ? 20 : (type === 'titan' ? 26 : 22);
       ctx.fillStyle = '#64748b';
-      ctx.fillRect(0, -3, 22, 6);
+      ctx.fillRect(0, -3, barrelLen, 6);
 
       ctx.restore();
     };
@@ -795,7 +1106,7 @@
     // ========================================================
     // 3. PAC-MAN / PICMAN MODE (DUO PAC-MAZE)
     // ========================================================
-    GameEngine.prototype.initPacmanMode = function(levelIndex) {
+    GameEngine.prototype.initPacmanMode = function (levelIndex) {
       this.camera.x = 0;
       this.camera.y = 0;
       this.camera.targetX = 0;
@@ -892,7 +1203,7 @@
       this.addFloatingText(480, 260, (this.gameTitle || 'DUO PAC-MAZE').toUpperCase(), '#ffd700', 28);
     };
 
-    GameEngine.prototype.updatePacman = function(dt) {
+    GameEngine.prototype.updatePacman = function (dt) {
       const p = this.pacman;
       if (!p) return;
 
@@ -1002,7 +1313,7 @@
           p.score += 10;
           this.createCoinParticles(dot.x, dot.y, '#fde047');
           if (window.audioManager && typeof window.audioManager.playWaka === 'function') {
-            try { window.audioManager.playWaka(); } catch(e) {}
+            try { window.audioManager.playWaka(); } catch (e) { }
           }
           break;
         }
@@ -1014,7 +1325,7 @@
         p.score += 1000;
         this.addFloatingText(480, 240, 'LABIRIN BERSIH! +1000 PTS', '#ffd700', 32);
         if (window.audioManager && typeof window.audioManager.playLevelComplete === 'function') {
-          try { window.audioManager.playLevelComplete(); } catch(e) {}
+          try { window.audioManager.playLevelComplete(); } catch (e) { }
         }
         setTimeout(() => {
           if (this.gameMode === 'pacman') {
@@ -1032,7 +1343,7 @@
           p.frightenedTimer = 8; // 8 seconds of frightened ghosts
           this.addFloatingText(pp.x, pp.y, 'POWER UP! HANTU BIRU!', '#00e5ff', 24);
           if (window.audioManager && typeof window.audioManager.playDoorOpen === 'function') {
-            try { window.audioManager.playDoorOpen(); } catch(e) {}
+            try { window.audioManager.playDoorOpen(); } catch (e) { }
           }
           break;
         }
@@ -1134,7 +1445,7 @@
             this.createExplosion(g.x, g.y, '#00e5ff', 16);
             this.addFloatingText(this.myPlayer.x, this.myPlayer.y - 12, '+200 HANTU TERMAKAN!', '#00e5ff', 22);
             if (window.audioManager && typeof window.audioManager.playEnemyDefeat === 'function') {
-              try { window.audioManager.playEnemyDefeat(); } catch(e) {}
+              try { window.audioManager.playEnemyDefeat(); } catch (e) { }
             }
           } else if ((p.invulnerableTimer || 0) <= 0) {
             // Caught by ghost!
@@ -1142,7 +1453,7 @@
             this.createExplosion(this.myPlayer.x, this.myPlayer.y, '#ef4444', 16);
             this.addFloatingText(this.myPlayer.x, this.myPlayer.y - 15, 'TERTANGKAP HANTU!', '#ef4444', 22);
             if (window.audioManager && typeof window.audioManager.playHurt === 'function') {
-              try { window.audioManager.playHurt(); } catch(e) {}
+              try { window.audioManager.playHurt(); } catch (e) { }
             }
             // Respawn to open bottom runway (completely clear of any walls)
             this.myPlayer.x = this.localSlot === 1 ? 440 : 520;
@@ -1156,7 +1467,7 @@
       this.updateParticles(dt);
     };
 
-    GameEngine.prototype.renderPacman = function() {
+    GameEngine.prototype.renderPacman = function () {
       const ctx = this.ctx;
       const p = this.pacman;
 
@@ -1265,7 +1576,7 @@
       ctx.restore();
     };
 
-    GameEngine.prototype.drawGhostSprite = function(ctx, x, y, color, isFrightened, vx = 0, vy = 0) {
+    GameEngine.prototype.drawGhostSprite = function (ctx, x, y, color, isFrightened, vx = 0, vy = 0) {
       ctx.save();
       ctx.translate(x, y);
 
@@ -1336,7 +1647,7 @@
       ctx.restore();
     };
 
-    GameEngine.prototype.drawPacMascot = function(ctx, x, y, type, angle = 0, isMoving = false, chompTimer = 0, isInvulnerable = false) {
+    GameEngine.prototype.drawPacMascot = function (ctx, x, y, type, angle = 0, isMoving = false, chompTimer = 0, isInvulnerable = false) {
       if (isInvulnerable && Math.floor(Date.now() / 100) % 2 === 0) return; // Flash effect when invulnerable
 
       ctx.save();
@@ -1416,7 +1727,7 @@
     // ========================================================
     // 4. MATH CHALLENGE MODE (SOAL MATEMATIKA CO-OP)
     // ========================================================
-    GameEngine.prototype.initMathMode = function(levelIndex) {
+    GameEngine.prototype.initMathMode = function (levelIndex) {
       this.camera.x = 0;
       this.camera.y = 0;
       this.camera.targetX = 0;
@@ -1440,7 +1751,7 @@
       this.addFloatingText(480, 260, (this.gameTitle || 'KUIS MATEMATIKA CO-OP').toUpperCase(), '#c084fc', 28);
     };
 
-    GameEngine.prototype.nextMathQuestion = function() {
+    GameEngine.prototype.nextMathQuestion = function () {
       const m = this.math;
       m.timer = 14;
 
@@ -1478,7 +1789,7 @@
       ];
     };
 
-    GameEngine.prototype.updateMath = function(dt) {
+    GameEngine.prototype.updateMath = function (dt) {
       const m = this.math;
       if (!m) return;
 
@@ -1502,7 +1813,7 @@
             this.addFloatingText(p.x, p.y - 40, `BENAR! +${bonus}`, '#10b981', 26);
             this.createExplosion(p.x, p.y, '#10b981', 20);
             if (window.audioManager && typeof window.audioManager.playDoorOpen === 'function') {
-              try { window.audioManager.playDoorOpen(); } catch(e) {}
+              try { window.audioManager.playDoorOpen(); } catch (e) { }
             }
             this.nextMathQuestion();
           } else {
@@ -1510,7 +1821,7 @@
             this.addFloatingText(p.x, p.y - 40, 'KURANG TEPAT!', '#ef4444', 22);
             this.createExplosion(p.x, p.y, '#ef4444', 12);
             if (window.audioManager && typeof window.audioManager.playHurt === 'function') {
-              try { window.audioManager.playHurt(); } catch(e) {}
+              try { window.audioManager.playHurt(); } catch (e) { }
             }
             this.nextMathQuestion();
           }
@@ -1522,7 +1833,7 @@
       this.updateParticles(dt);
     };
 
-    GameEngine.prototype.renderMath = function() {
+    GameEngine.prototype.renderMath = function () {
       const ctx = this.ctx;
       const m = this.math;
 
@@ -1601,19 +1912,19 @@
       ctx.restore();
     };
 
-    GameEngine.prototype.renderPlayer = function(player, type) {
+    GameEngine.prototype.renderPlayer = function (player, type) {
       if (typeof this.renderCharacter === 'function') {
         this.renderCharacter(this.ctx, player);
       }
     };
 
-    GameEngine.prototype.renderFloatingTexts = function(ctx) {
+    GameEngine.prototype.renderFloatingTexts = function (ctx) {
       if (typeof this.renderOverlays === 'function') {
         this.renderOverlays(ctx);
       }
     };
 
-    GameEngine.prototype.createCoinParticles = function(x, y, color = '#ffd700') {
+    GameEngine.prototype.createCoinParticles = function (x, y, color = '#ffd700') {
       if (typeof this.createSpawnSparks === 'function') {
         this.createSpawnSparks(x, y, color);
       }
@@ -1622,11 +1933,13 @@
     // ========================================================
     // 5. SNAKE MODE (DUO SNAKE: PEMBURU BINTANG ENERGI)
     // ========================================================
-    GameEngine.prototype.initSnakeMode = function(levelIndex) {
+    GameEngine.prototype.initSnakeMode = function (levelIndex) {
       this.camera.x = 0;
       this.camera.y = 0;
       this.camera.targetX = 0;
       this.camera.tilt = 0;
+      this.particles = [];
+      this.floatingTexts = [];
 
       const cellSize = 20;
       this.snake = {
@@ -1675,15 +1988,25 @@
       this.addFloatingText(480, 260, (this.gameTitle || 'DUO SNAKE: PEMBURU BINTANG ENERGI').toUpperCase(), '#00e5ff', 28);
     };
 
-    GameEngine.prototype.spawnSnakeStars = function(count) {
+    GameEngine.prototype.spawnSnakeStars = function (count) {
       if (!this.snake) return;
       const s = this.snake;
       for (let i = 0; i < count; i++) {
         if (s.stars.length >= 8) break;
-        const x = Math.floor(s.minX + 1 + Math.random() * (s.maxX - s.minX - 2));
-        const y = Math.floor(s.minY + 1 + Math.random() * (s.maxY - s.minY - 2));
-        const exists = s.stars.some(st => st.x === x && st.y === y);
-        if (!exists) {
+        // Search for a location that is NOT inside any snake body and not on an existing star
+        for (let attempt = 0; attempt < 80; attempt++) {
+          const x = Math.floor(s.minX + 1 + Math.random() * (s.maxX - s.minX - 2));
+          const y = Math.floor(s.minY + 1 + Math.random() * (s.maxY - s.minY - 2));
+
+          const starConflict = s.stars.some(st => st.x === x && st.y === y);
+          if (starConflict) continue;
+
+          const p1Conflict = s.p1 && s.p1.body && s.p1.body.some(b => b.x === x && b.y === y);
+          if (p1Conflict) continue;
+
+          const p2Conflict = s.p2 && s.p2.body && s.p2.body.some(b => b.x === x && b.y === y);
+          if (p2Conflict) continue;
+
           const isMega = Math.random() < 0.25;
           s.stars.push({
             x,
@@ -1692,13 +2015,17 @@
             points: isMega ? 50 : 15,
             spawnTime: Date.now()
           });
+          break;
         }
       }
     };
 
-    GameEngine.prototype.updateSnake = function(dt) {
+    GameEngine.prototype.updateSnake = function (dt) {
       const s = this.snake;
       if (!s) return;
+
+      // CRITICAL: Update particle effects and floating text animations so they fade out and disappear!
+      this.updateParticles(dt);
 
       const mySnake = this.localSlot === 1 ? s.p1 : s.p2;
       const peerSnake = this.localSlot === 1 ? s.p2 : s.p1;
@@ -1715,6 +2042,13 @@
         if (mySnake.dir.y !== -1) nd = { x: 0, y: 1 };
       }
       mySnake.nextDir = nd;
+
+      // Broadcast steering to peer player in multiplayer
+      if (window.networkManager && typeof window.networkManager.emitPlayerUpdate === 'function') {
+        window.networkManager.emitPlayerUpdate({
+          snakeDir: mySnake.nextDir
+        });
+      }
 
       // Turbo boost when holding place button or shift
       const isTurbo = this.keysDown['shift'] || this.keysDown[' '] || this.touchState.place;
@@ -1752,7 +2086,7 @@
       }
     };
 
-    GameEngine.prototype.stepOneSnake = function(snk) {
+    GameEngine.prototype.stepOneSnake = function (snk) {
       const s = this.snake;
       snk.dir = snk.nextDir;
       const head = snk.body[0];
@@ -1794,7 +2128,7 @@
       }
     };
 
-    GameEngine.prototype.renderSnake = function() {
+    GameEngine.prototype.renderSnake = function () {
       const ctx = this.ctx;
       const s = this.snake;
       if (!s) return;
@@ -1852,7 +2186,7 @@
       ctx.restore();
     };
 
-    GameEngine.prototype.drawOneSnake = function(ctx, snk) {
+    GameEngine.prototype.drawOneSnake = function (ctx, snk) {
       const s = this.snake;
       const cs = s.cellSize;
 
@@ -1912,7 +2246,7 @@
       ctx.restore();
     };
 
-    GameEngine.prototype.drawEnergyStar = function(ctx, cx, cy, isMega, angle) {
+    GameEngine.prototype.drawEnergyStar = function (ctx, cx, cy, isMega, angle) {
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(angle);
@@ -1942,7 +2276,7 @@
     // ========================================================
     // 6. PONG MODE (NEON PONG: PERTARUNGAN REFLEKS)
     // ========================================================
-    GameEngine.prototype.initPongMode = function(levelIndex) {
+    GameEngine.prototype.initPongMode = function (levelIndex) {
       this.camera.x = 0;
       this.camera.y = 0;
       this.camera.targetX = 0;
@@ -1968,7 +2302,7 @@
       this.addFloatingText(480, 260, (this.gameTitle || 'NEON PONG: PERTARUNGAN REFLEKS').toUpperCase(), '#00e5ff', 28);
     };
 
-    GameEngine.prototype.updatePong = function(dt) {
+    GameEngine.prototype.updatePong = function (dt) {
       const p = this.pong;
       if (!p) return;
 
@@ -2051,9 +2385,11 @@
         b.vy = 180 * (Math.random() > 0.5 ? 1 : -1);
         this.addFloatingText(480, 240, 'RELI BARU!', '#ffd700', 22);
       }
+
+      this.updateParticles(dt);
     };
 
-    GameEngine.prototype.renderPong = function() {
+    GameEngine.prototype.renderPong = function () {
       const ctx = this.ctx;
       const p = this.pong;
       if (!p) return;
@@ -2125,7 +2461,7 @@
       ctx.restore();
     };
 
-    GameEngine.prototype.drawPongPaddle = function(ctx, pad) {
+    GameEngine.prototype.drawPongPaddle = function (ctx, pad) {
       ctx.save();
       ctx.fillStyle = pad.color;
       ctx.shadowColor = pad.color;
@@ -2143,7 +2479,7 @@
 
     // Master dispatcher for update & render
     const origUpdate = GameEngine.prototype.update;
-    GameEngine.prototype.update = function(dt) {
+    GameEngine.prototype.update = function (dt) {
       if (this.gameMode === 'shooter') {
         this.updateShooter(dt);
       } else if (this.gameMode === 'tank') {
@@ -2162,7 +2498,7 @@
     };
 
     const origRender = GameEngine.prototype.render;
-    GameEngine.prototype.render = function() {
+    GameEngine.prototype.render = function () {
       if (this.gameMode === 'shooter') {
         this.renderShooter();
       } else if (this.gameMode === 'tank') {
