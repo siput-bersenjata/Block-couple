@@ -196,63 +196,78 @@
     // Update Touch Controls & HUD text for each mode
     GameEngine.prototype.updateModeControls = function () {
       const btnJump = document.getElementById('btnJump');
+      const btnActionRight = document.getElementById('btnActionRight');
       const btnPlace = document.getElementById('btnPlace');
       const btnClear = document.getElementById('btnClear');
       const btnUp = document.getElementById('btnUp');
       const btnDown = document.getElementById('btnDown');
       const banner = document.getElementById('hintBanner');
 
+      const setBtn = (el, text, isVisible = true) => {
+        if (!el) return;
+        if (isVisible) {
+          el.classList.remove('hidden');
+          const label = el.querySelector('.btn-main-label');
+          if (label && text) label.innerText = text;
+        } else {
+          el.classList.add('hidden');
+        }
+      };
+
       if (this.gameMode === 'shooter') {
-        if (btnJump) btnJump.querySelector('.btn-main-label').innerText = 'TEMBAK';
-        if (btnPlace) btnPlace.querySelector('.btn-main-label').innerText = 'BOM';
-        if (btnClear) btnClear.classList.add('hidden');
+        setBtn(btnJump, 'TEMBAK', true);
+        setBtn(btnActionRight, 'TEMBAK', true);
+        setBtn(btnPlace, 'BOM', true);
+        setBtn(btnClear, '', false);
         if (btnUp) btnUp.classList.add('hidden');
         if (btnDown) btnDown.classList.add('hidden');
         if (banner) banner.innerText = 'Gunakan tombol [KIRI] & [KANAN] untuk menghindar, dan [TEMBAK] untuk tembak alien!';
       } else if (this.gameMode === 'tank') {
-        if (btnJump) btnJump.querySelector('.btn-main-label').innerText = 'TEMBAK';
-        if (btnPlace) btnPlace.querySelector('.btn-main-label').innerText = 'PERISAI';
-        if (btnClear) btnClear.classList.add('hidden');
+        setBtn(btnJump, 'TEMBAK', true);
+        setBtn(btnActionRight, 'TEMBAK', true);
+        setBtn(btnPlace, 'PERISAI', true);
+        setBtn(btnClear, '', false);
         if (btnUp) btnUp.classList.remove('hidden');
         if (btnDown) btnDown.classList.remove('hidden');
         if (banner) banner.innerText = 'Kendalikan tank dengan 4 arah, hancurkan bata rintangan dan tembak tank musuh!';
       } else if (this.gameMode === 'pacman') {
-        if (btnJump) btnJump.querySelector('.btn-main-label').innerText = 'TURBO';
-        if (btnPlace) btnPlace.classList.add('hidden');
-        if (btnClear) btnClear.classList.add('hidden');
+        setBtn(btnJump, 'TURBO', true);
+        setBtn(btnActionRight, 'TURBO', true);
+        setBtn(btnPlace, '', false);
+        setBtn(btnClear, '', false);
         if (btnUp) btnUp.classList.remove('hidden');
         if (btnDown) btnDown.classList.remove('hidden');
         if (banner) banner.innerText = 'Makan semua titik energi di labirin! Hindari hantu atau makan Pelet Bintang untuk membalas!';
       } else if (this.gameMode === 'math') {
-        if (btnJump) btnJump.querySelector('.btn-main-label').innerText = 'LOMPAT';
-        if (btnPlace) btnPlace.classList.remove('hidden');
-        if (btnPlace) btnPlace.querySelector('.btn-main-label').innerText = 'INJAK';
-        if (btnClear) btnClear.classList.add('hidden');
+        setBtn(btnJump, 'LOMPAT', true);
+        setBtn(btnActionRight, 'LOMPAT', true);
+        setBtn(btnPlace, 'INJAK', true);
+        setBtn(btnClear, '', false);
         if (btnUp) btnUp.classList.remove('hidden');
         if (btnDown) btnDown.classList.remove('hidden');
         if (banner) banner.innerText = 'Pecahkan soal matematika di atas! Lompat dan injak portal angka yang benar bersama partner!';
       } else if (this.gameMode === 'snake') {
-        if (btnJump) btnJump.querySelector('.btn-main-label').innerText = 'BAWAH';
-        if (btnPlace) btnPlace.classList.remove('hidden');
-        if (btnPlace) btnPlace.querySelector('.btn-main-label').innerText = 'TURBO';
-        if (btnClear) btnClear.classList.add('hidden');
+        setBtn(btnJump, 'BAWAH', true);
+        setBtn(btnActionRight, 'TURBO', true);
+        setBtn(btnPlace, 'TURBO', true);
+        setBtn(btnClear, '', false);
         if (btnUp) btnUp.classList.remove('hidden');
         if (btnDown) btnDown.classList.remove('hidden');
         if (banner) banner.innerText = 'Kendalikan ular dengan 4 arah! Makan bintang energi emas dan raih rekor skor bersama partner!';
       } else if (this.gameMode === 'pong') {
-        if (btnJump) btnJump.querySelector('.btn-main-label').innerText = 'BAWAH';
-        if (btnPlace) btnPlace.classList.add('hidden');
-        if (btnClear) btnClear.classList.add('hidden');
+        setBtn(btnJump, 'BAWAH', true);
+        setBtn(btnActionRight, 'BAWAH', true);
+        setBtn(btnPlace, '', false);
+        setBtn(btnClear, '', false);
         if (btnUp) btnUp.classList.remove('hidden');
         if (btnDown) btnDown.classList.remove('hidden');
         if (banner) banner.innerText = 'Gerakkan raket ke atas & bawah untuk menangkis bola energi neon bersama partner!';
       } else {
         // Platformer
-        if (btnJump) btnJump.querySelector('.btn-main-label').innerText = 'LOMPAT';
-        if (btnPlace) btnPlace.classList.remove('hidden');
-        if (btnPlace) btnPlace.querySelector('.btn-main-label').innerText = 'BALOK';
-        if (btnClear) btnClear.classList.remove('hidden');
-        if (btnClear) btnClear.querySelector('.btn-main-label').innerText = 'HAPUS';
+        setBtn(btnJump, 'LOMPAT', true);
+        setBtn(btnActionRight, 'LOMPAT', true);
+        setBtn(btnPlace, 'BALOK', true);
+        setBtn(btnClear, 'HAPUS', true);
         if (btnUp) btnUp.classList.remove('hidden');
         if (btnDown) btnDown.classList.remove('hidden');
         if (banner) banner.innerText = 'Gunakan tombol [Buat Balok] untuk jembatan jurang, dan hindari / kurung monster lendir!';

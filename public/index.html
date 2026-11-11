@@ -89,17 +89,32 @@
         <div class="pad-sub">CONSOLE PAD</div>
       </div>
 
-      <!-- Right Hand: Actions -->
+      <!-- Right Hand: PlayStation Style Diamond Action Pad -->
       <div class="touch-group touch-right">
-        <button id="btnClear" class="touch-btn action-btn btn-clear" aria-label="Hapus Balok">
-          <span class="btn-main-label">HAPUS</span>
-        </button>
-        <button id="btnPlace" class="touch-btn action-btn btn-place" aria-label="Buat Balok">
-          <span class="btn-main-label">BALOK</span>
-        </button>
-        <button id="btnJump" class="touch-btn action-btn btn-jump" aria-label="Lompat">
-          <span class="btn-main-label">LOMPAT</span>
-        </button>
+        <div id="psActionPad" class="touch-ps-pad" role="group" aria-label="Gamepad Action Cluster">
+          <!-- Top: Triangle (△) - Hapus / Utility -->
+          <button id="btnClear" class="touch-btn ps-btn ps-triangle" aria-label="Segitiga: Hapus">
+            <span class="ps-symbol" aria-hidden="true">&#9651;</span>
+            <span class="btn-main-label">HAPUS</span>
+          </button>
+          <!-- Left: Square (□) - Balok / Secondary Action -->
+          <button id="btnPlace" class="touch-btn ps-btn ps-square" aria-label="Kotak: Balok">
+            <span class="ps-symbol" aria-hidden="true">&#9633;</span>
+            <span class="btn-main-label">BALOK</span>
+          </button>
+          <!-- Center: PlayStation Hub Gem -->
+          <div class="ps-center-gem" aria-hidden="true"></div>
+          <!-- Right: Circle (○) - Action / Quick Jump -->
+          <button id="btnActionRight" class="touch-btn ps-btn ps-circle" aria-label="Bulat: Aksi">
+            <span class="ps-symbol" aria-hidden="true">&#9675;</span>
+            <span class="btn-main-label">LOMPAT</span>
+          </button>
+          <!-- Bottom: Cross (✕) - Primary Jump / Confirm -->
+          <button id="btnJump" class="touch-btn ps-btn ps-cross btn-jump" aria-label="Silang: Lompat">
+            <span class="ps-symbol" aria-hidden="true">&#10005;</span>
+            <span class="btn-main-label">LOMPAT</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -384,14 +399,14 @@
   <div id="toast" class="toast hidden">Link Berhasil Disalin!</div>
 
   <!-- WebRTC PeerJS Engine for Vercel -->
-  <script src="js/peerjs.min.js?v=2.9.7"></script>
+  <script src="js/peerjs.min.js?v=2.9.8"></script>
   <!-- Game scripts -->
-  <script src="js/audio.js?v=2.9.7"></script>
-  <script src="js/levels.js?v=2.9.7"></script>
-  <script src="js/game.js?v=2.9.7"></script>
-  <script src="js/modes.js?v=2.9.7"></script>
-  <script src="js/network.js?v=2.9.7"></script>
-  <script src="js/previews.js?v=2.9.7"></script>
+  <script src="js/audio.js?v=2.9.8"></script>
+  <script src="js/levels.js?v=2.9.8"></script>
+  <script src="js/game.js?v=2.9.8"></script>
+  <script src="js/modes.js?v=2.9.8"></script>
+  <script src="js/network.js?v=2.9.8"></script>
+  <script src="js/previews.js?v=2.9.8"></script>
 
   <!-- UI Event Bindings & LocalStorage -->
   <script>

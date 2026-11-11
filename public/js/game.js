@@ -48,8 +48,11 @@ class GameEngine {
     this.touchState = {
       left: false,
       right: false,
+      up: false,
       down: false,
-      jump: false
+      jump: false,
+      place: false,
+      clear: false
     };
 
     // Physics constants - tuned for realistic, natural, and satisfying jump arcs
@@ -227,36 +230,84 @@ class GameEngine {
       const el = document.getElementById(elementId);
       if (!el) return;
 
+      let isDown = false;
       const onStart = (e) => {
-        e.preventDefault();
+        if (e && e.cancelable && e.type && e.type.startsWith('touch')) {
+          e.preventDefault();
+        }
+        if (isDown) return;
+        isDown = true;
+        el.classList.add('btn-pressed');
         window.audioManager && window.audioManager.init();
-        startHandler();
-      };
-      const onEnd = (e) => {
-        e.preventDefault();
-        endHandler();
+        if (startHandler) startHandler(e);
       };
 
+      const onEnd = (e) => {
+        if (e && e.cancelable && e.type && e.type.startsWith('touch')) {
+          e.preventDefault();
+        }
+        if (!isDown) return;
+        isDown = false;
+        el.classList.remove('btn-pressed');
+        if (endHandler) endHandler(e);
+      };
+
+      // Modern Pointer events (touch, stylus, mouse)
+      el.addEventListener('pointerdown', onStart);
+      el.addEventListener('pointerup', onEnd);
+      el.addEventListener('pointercancel', onEnd);
+
+      // Touch events fallback
       el.addEventListener('touchstart', onStart, { passive: false });
       el.addEventListener('touchend', onEnd, { passive: false });
       el.addEventListener('touchcancel', onEnd, { passive: false });
+
+      // Mouse events fallback
       el.addEventListener('mousedown', onStart);
       el.addEventListener('mouseup', onEnd);
       el.addEventListener('mouseleave', onEnd);
     };
 
-    bindTouchBtn('btnUp', () => { this.touchState.up = true; }, () => { this.touchState.up = false; });
+    const handleJumpStart = () => {
+      this.touchState.jump = true;
+      this.triggerJump();
+    };
+    const handleJumpEnd = () => {
+      this.touchState.jump = false;
+    };
+
+    bindTouchBtn('btnUp', () => { 
+      this.touchState.up = true; 
+      if (!this.gameMode || this.gameMode === 'platformer') {
+        this.triggerJump();
+      }
+    }, () => { 
+      this.touchState.up = false; 
+    });
     bindTouchBtn('btnLeft', () => { this.touchState.left = true; }, () => { this.touchState.left = false; });
     bindTouchBtn('btnRight', () => { this.touchState.right = true; }, () => { this.touchState.right = false; });
     bindTouchBtn('btnDown', () => { this.touchState.down = true; }, () => { this.touchState.down = false; });
-    bindTouchBtn('btnJump', () => { 
-      this.touchState.jump = true; 
-      this.myPlayer.jumpBuffer = 6;
+
+    // Bottom Cross (✕) - Primary Jump
+    bindTouchBtn('btnJump', handleJumpStart, handleJumpEnd);
+    // Right Circle (○) - Action / Secondary Jump
+    bindTouchBtn('btnActionRight', handleJumpStart, handleJumpEnd);
+
+    // Left Square (□) - Place Block
+    bindTouchBtn('btnPlace', () => { 
+      this.touchState.place = true; 
+      this.requestPlaceBlock(); 
     }, () => { 
-      this.touchState.jump = false; 
+      this.touchState.place = false; 
     });
-    bindTouchBtn('btnPlace', () => { this.requestPlaceBlock(); }, () => {});
-    bindTouchBtn('btnClear', () => { this.requestClearBlocks(); }, () => {});
+
+    // Top Triangle (△) - Clear Blocks
+    bindTouchBtn('btnClear', () => { 
+      this.touchState.clear = true; 
+      this.requestClearBlocks(); 
+    }, () => { 
+      this.touchState.clear = false; 
+    });
 
     // Ergonomic D-Pad Slide & Glide Controller for Mobile Touch
     const dpadEl = document.getElementById('dpadContainer');
@@ -302,6 +353,10 @@ class GameEngine {
               else isUp = true;
             }
           }
+        }
+
+        if (isUp && !this.touchState.up && (!this.gameMode || this.gameMode === 'platformer')) {
+          this.triggerJump();
         }
 
         this.touchState.up = isUp;
@@ -412,6 +467,23 @@ class GameEngine {
     setTimeout(handleResize, 50);
     setTimeout(handleResize, 300);
     setTimeout(handleResize, 1000);
+  }
+
+  triggerJump() {
+    if (!this.myPlayer) return;
+    const p = this.myPlayer;
+    p.jumpBuffer = 14;
+    if (p.isGrounded || p.coyoteTimer > 0) {
+      p.vy = this.JUMP_FORCE;
+      p.coyoteTimer = 0;
+      p.jumpBuffer = 0;
+      p.isGrounded = false;
+      p.squashX = 0.82;
+      p.squashY = 1.25;
+      p.expression = 'jump';
+      window.audioManager && window.audioManager.playJump();
+      this.createDust(p.x + p.width / 2, p.y + p.height);
+    }
   }
 
   requestPlaceBlock() {
@@ -629,6 +701,14 @@ class GameEngine {
       p.coyoteTimer--;
     }
 
+    const jumpHeld = this.keysDown['w'] || this.keysDown['arrowup'] || this.keysDown[' '] || this.touchState.jump;
+    const jumpJustPressed = jumpHeld && !p._jumpHeldPrev;
+    p._jumpHeldPrev = jumpHeld;
+
+    if (jumpJustPressed) {
+      p.jumpBuffer = 14;
+    }
+
     if (p.jumpBuffer > 0) {
       if (p.coyoteTimer > 0) {
         p.vy = this.JUMP_FORCE;
@@ -646,7 +726,6 @@ class GameEngine {
     }
 
     // Variable jump height - smooth, realistic release
-    const jumpHeld = this.keysDown['w'] || this.keysDown['arrowup'] || this.keysDown[' '] || this.touchState.jump;
     if (!jumpHeld && p.vy < -2.8) {
       p.vy += 0.38;
     }
