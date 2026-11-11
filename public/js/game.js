@@ -257,6 +257,113 @@ class GameEngine {
     });
     bindTouchBtn('btnPlace', () => { this.requestPlaceBlock(); }, () => {});
     bindTouchBtn('btnClear', () => { this.requestClearBlocks(); }, () => {});
+
+    // Ergonomic D-Pad Slide & Glide Controller for Mobile Touch
+    const dpadEl = document.getElementById('dpadContainer');
+    if (dpadEl) {
+      const updateDpadTouch = (touch) => {
+        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+        const upBtn = document.getElementById('btnUp');
+        const downBtn = document.getElementById('btnDown');
+        const leftBtn = document.getElementById('btnLeft');
+        const rightBtn = document.getElementById('btnRight');
+
+        let isUp = false;
+        let isDown = false;
+        let isLeft = false;
+        let isRight = false;
+
+        if (el) {
+          const btn = el.closest ? el.closest('.dpad-btn') : null;
+          if (btn) {
+            if (btn.id === 'btnUp') isUp = true;
+            else if (btn.id === 'btnDown') isDown = true;
+            else if (btn.id === 'btnLeft') isLeft = true;
+            else if (btn.id === 'btnRight') isRight = true;
+          }
+        }
+
+        // Geometric direction fallback when sliding between arm gaps
+        if (!isUp && !isDown && !isLeft && !isRight) {
+          const rect = dpadEl.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          const dx = touch.clientX - cx;
+          const dy = touch.clientY - cy;
+          const dist = Math.hypot(dx, dy);
+
+          if (dist > 12 && dist < rect.width * 0.9) {
+            if (Math.abs(dx) > Math.abs(dy) * 0.7) {
+              if (dx > 0) isRight = true;
+              else isLeft = true;
+            }
+            if (Math.abs(dy) > Math.abs(dx) * 0.7) {
+              if (dy > 0) isDown = true;
+              else isUp = true;
+            }
+          }
+        }
+
+        this.touchState.up = isUp;
+        this.touchState.down = isDown;
+        this.touchState.left = isLeft;
+        this.touchState.right = isRight;
+
+        if (upBtn) upBtn.classList.toggle('dpad-active', isUp);
+        if (downBtn) downBtn.classList.toggle('dpad-active', isDown);
+        if (leftBtn) leftBtn.classList.toggle('dpad-active', isLeft);
+        if (rightBtn) rightBtn.classList.toggle('dpad-active', isRight);
+      };
+
+      const clearDpadTouch = () => {
+        this.touchState.up = false;
+        this.touchState.down = false;
+        this.touchState.left = false;
+        this.touchState.right = false;
+        const upBtn = document.getElementById('btnUp');
+        const downBtn = document.getElementById('btnDown');
+        const leftBtn = document.getElementById('btnLeft');
+        const rightBtn = document.getElementById('btnRight');
+        if (upBtn) upBtn.classList.remove('dpad-active');
+        if (downBtn) downBtn.classList.remove('dpad-active');
+        if (leftBtn) leftBtn.classList.remove('dpad-active');
+        if (rightBtn) rightBtn.classList.remove('dpad-active');
+      };
+
+      let activeDpadTouchId = null;
+
+      dpadEl.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        window.audioManager && window.audioManager.init();
+        if (e.changedTouches && e.changedTouches[0]) {
+          activeDpadTouchId = e.changedTouches[0].identifier;
+          updateDpadTouch(e.changedTouches[0]);
+        }
+      }, { passive: false });
+
+      dpadEl.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        for (let i = 0; i < e.touches.length; i++) {
+          if (e.touches[i].identifier === activeDpadTouchId) {
+            updateDpadTouch(e.touches[i]);
+            break;
+          }
+        }
+      }, { passive: false });
+
+      const onDpadEnd = (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === activeDpadTouchId) {
+            activeDpadTouchId = null;
+            clearDpadTouch();
+            break;
+          }
+        }
+      };
+
+      dpadEl.addEventListener('touchend', onDpadEnd, { passive: false });
+      dpadEl.addEventListener('touchcancel', onDpadEnd, { passive: false });
+    }
   }
 
   setupResize() {
