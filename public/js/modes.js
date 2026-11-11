@@ -1244,28 +1244,6 @@
       ctx.arc(5.4, -8.3, 1.0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Unique character mascot accessories:
-      if (type === 'bona') {
-        // Bona's cute hair ribbon / bow on top
-        ctx.fillStyle = '#f43f5e';
-        ctx.beginPath();
-        ctx.arc(-2, -15, 3.5, 0, Math.PI * 2);
-        ctx.arc(4, -15, 3.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#ffd700';
-        ctx.beginPath();
-        ctx.arc(1, -15, 2, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        // Bobi's cute cyber antenna or cap badge
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillRect(-1, -17, 2, 3);
-        ctx.fillStyle = '#00e5ff';
-        ctx.beginPath();
-        ctx.arc(0, -18, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
       ctx.restore();
     };
 
