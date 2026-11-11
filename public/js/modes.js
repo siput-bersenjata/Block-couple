@@ -562,6 +562,15 @@
       const t = this.tank;
       if (!t) return;
 
+      // Anti-stuck safety guard for tank: if ever caught inside a brick, relocate to base
+      for (const b of t.bricks) {
+        if (circleRectOverlap(this.myPlayer.x, this.myPlayer.y, 16, b.x, b.y, 20, 20)) {
+          this.myPlayer.x = 120;
+          this.myPlayer.y = this.localSlot === 1 ? 200 : 340;
+          break;
+        }
+      }
+
       // Tank 4-way Control
       let vx = 0;
       let vy = 0;
@@ -792,15 +801,17 @@
       this.camera.targetX = 0;
       this.camera.tilt = 0;
 
-      this.myPlayer.x = 240;
-      this.myPlayer.y = 270;
-      this.myPlayer.pacAngle = 0;
+      // P1 & P2 Spawn Points - Open, spacious bottom runway below the ghost house
+      // 74px vertical clearance from ghost house and boundary, 160px horizontal clearance from divider walls
+      this.myPlayer.x = this.localSlot === 1 ? 440 : 520;
+      this.myPlayer.y = 414;
+      this.myPlayer.pacAngle = this.localSlot === 1 ? Math.PI : 0;
       this.myPlayer.isMoving = false;
       this.myPlayer.chompTimer = 0;
 
-      this.peerPlayer.x = 720;
-      this.peerPlayer.y = 270;
-      this.peerPlayer.pacAngle = Math.PI;
+      this.peerPlayer.x = this.localSlot === 1 ? 520 : 440;
+      this.peerPlayer.y = 414;
+      this.peerPlayer.pacAngle = this.localSlot === 1 ? 0 : Math.PI;
       this.peerPlayer.isMoving = false;
       this.peerPlayer.chompTimer = 0;
 
@@ -853,6 +864,9 @@
           // Never place dots inside or on ghost house perimeter
           if (x >= 345 && x <= 615 && y >= 165 && y <= 350) continue;
 
+          // Keep player spawn points clean
+          if (Math.hypot(x - 440, y - 414) < 25 || Math.hypot(x - 520, y - 414) < 25) continue;
+
           // Check if dot overlaps or is within 18px of any wall
           let collides = false;
           for (const w of walls) {
@@ -883,6 +897,23 @@
       if (!p) return;
 
       if (p.invulnerableTimer > 0) p.invulnerableTimer -= dt;
+
+      // Anti-stuck safety guard: If player is ever detected inside a wall or gate, instantly relocate to safe spawn
+      const safeSpawn = (this.localSlot === 1) ? { x: 440, y: 414 } : { x: 520, y: 414 };
+      let isStuck = false;
+      for (const w of p.walls) {
+        if (circleRectOverlap(this.myPlayer.x, this.myPlayer.y, 14, w.x, w.y, w.w, w.h)) {
+          isStuck = true;
+          break;
+        }
+      }
+      if (!isStuck && circleRectOverlap(this.myPlayer.x, this.myPlayer.y, 14, p.gate.x, p.gate.y, p.gate.w, p.gate.h)) {
+        isStuck = true;
+      }
+      if (isStuck) {
+        this.myPlayer.x = safeSpawn.x;
+        this.myPlayer.y = safeSpawn.y;
+      }
 
       // Pacman 4-way movement
       let vx = 0;
@@ -1113,10 +1144,10 @@
             if (window.audioManager && typeof window.audioManager.playHurt === 'function') {
               try { window.audioManager.playHurt(); } catch(e) {}
             }
-            // Respawn to starting side
-            this.myPlayer.x = this.localSlot === 1 ? 240 : 720;
-            this.myPlayer.y = 270;
-            this.myPlayer.pacAngle = this.localSlot === 1 ? 0 : Math.PI;
+            // Respawn to open bottom runway (completely clear of any walls)
+            this.myPlayer.x = this.localSlot === 1 ? 440 : 520;
+            this.myPlayer.y = 414;
+            this.myPlayer.pacAngle = this.localSlot === 1 ? Math.PI : 0;
           }
         }
       }
