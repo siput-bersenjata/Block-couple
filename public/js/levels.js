@@ -642,7 +642,7 @@ const COOP_GAMES = [
     mode: 'snake', 
     tag: 'Snake Co-op', 
     category: 'arcade',
-    desc: 'Dua ular neon tumbuh panjang saat mengumpulkan bintang energi. Bekerjasama meliuk di arena tanpa tabrakan.',
+    desc: 'Duel 1 menit dua ular neon mengumpulkan bintang energi! Gunakan turbo mandiri dan hindari menabrak tubuh lawan.',
     targetLevel: 10, 
     maxLevel: 10 
   },

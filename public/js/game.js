@@ -1043,7 +1043,13 @@ class GameEngine {
     }
   }
 
-  addFloatingText(x, y, text, color = '#ffffff', size = 18) {
+  addFloatingText(x, y, text, color = '#ffffff', size = 18, duration = 1.0) {
+    if (!this.floatingTexts) this.floatingTexts = [];
+    // Ensure screen is never overloaded with stale or stacked floating banners
+    while (this.floatingTexts.length >= 3) {
+      this.floatingTexts.shift();
+    }
+    const maxLife = duration || 1.0;
     this.floatingTexts.push({
       x,
       y,
@@ -1051,7 +1057,8 @@ class GameEngine {
       color,
       size,
       alpha: 1,
-      life: 1.5
+      life: maxLife,
+      maxLife: maxLife
     });
   }
 
@@ -1069,38 +1076,64 @@ class GameEngine {
   }
 
   updateParticles(dt) {
+    if (!this.particles) this.particles = [];
+    if (!this.floatingTexts) this.floatingTexts = [];
+    if (!this.emotes) this.emotes = [];
+
+    // Particle pool safety cap
+    if (this.particles.length > 80) {
+      this.particles.splice(0, this.particles.length - 80);
+    }
+
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.life -= dt;
-      p.alpha = Math.max(0, p.life);
+      if (!p) {
+        this.particles.splice(i, 1);
+        continue;
+      }
+      p.x += (p.vx || 0);
+      p.y += (p.vy || 0);
+      const safeDt = (dt && !isNaN(dt)) ? dt : 0.016;
+      p.life = (p.life !== undefined ? p.life : 0.8) - safeDt;
+      const maxL = p.maxLife || 0.8;
+      p.alpha = Math.min(1, Math.max(0, p.life / maxL));
 
       if (p.type === 'confetti') {
-        p.rotation += p.rotSpeed;
+        p.rotation += (p.rotSpeed || 0.05);
       }
 
-      if (p.life <= 0) {
+      if (p.life <= 0 || isNaN(p.life)) {
         this.particles.splice(i, 1);
       }
     }
 
     for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
       const ft = this.floatingTexts[i];
-      ft.y -= dt * 24;
-      ft.life -= dt;
-      ft.alpha = Math.max(0, ft.life / 1.5);
-      if (ft.life <= 0) {
+      if (!ft) {
+        this.floatingTexts.splice(i, 1);
+        continue;
+      }
+      const safeDt = (dt && !isNaN(dt)) ? dt : 0.016;
+      ft.y -= safeDt * 48; // Smooth upward float
+      ft.life -= safeDt;
+      const maxL = ft.maxLife || 1.0;
+      ft.alpha = Math.min(1, Math.max(0, ft.life / maxL));
+      if (ft.life <= 0 || isNaN(ft.life)) {
         this.floatingTexts.splice(i, 1);
       }
     }
 
     for (let i = this.emotes.length - 1; i >= 0; i--) {
       const em = this.emotes[i];
-      em.y -= dt * 15;
-      em.life -= dt;
-      em.alpha = Math.max(0, em.life / 2);
-      if (em.life <= 0) {
+      if (!em) {
+        this.emotes.splice(i, 1);
+        continue;
+      }
+      const safeDt = (dt && !isNaN(dt)) ? dt : 0.016;
+      em.y -= safeDt * 18;
+      em.life -= safeDt;
+      em.alpha = Math.min(1, Math.max(0, em.life / 2));
+      if (em.life <= 0 || isNaN(em.life)) {
         this.emotes.splice(i, 1);
       }
     }
@@ -1773,27 +1806,33 @@ class GameEngine {
   }
 
   renderOverlays(ctx) {
-    for (const ft of this.floatingTexts) {
-      ctx.save();
-      ctx.globalAlpha = ft.alpha;
-      ctx.fillStyle = ft.color;
-      ctx.font = `bold ${ft.size}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(0,0,0,0.8)';
-      ctx.shadowBlur = 8;
-      ctx.fillText(ft.text, ft.x, ft.y);
-      ctx.restore();
+    if (this.floatingTexts && this.floatingTexts.length) {
+      for (const ft of this.floatingTexts) {
+        if (!ft || ft.alpha <= 0.02) continue;
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, Math.max(0, ft.alpha));
+        ctx.fillStyle = ft.color || '#ffffff';
+        ctx.font = `800 ${ft.size || 18}px Outfit, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = 8;
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+      }
     }
 
-    for (const em of this.emotes) {
-      ctx.save();
-      ctx.globalAlpha = em.alpha;
-      ctx.font = '28px Arial';
-      ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(0,0,0,0.6)';
-      ctx.shadowBlur = 6;
-      ctx.fillText(em.char, em.x, em.y);
-      ctx.restore();
+    if (this.emotes && this.emotes.length) {
+      for (const em of this.emotes) {
+        if (!em || em.alpha <= 0.02) continue;
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, Math.max(0, em.alpha));
+        ctx.font = '28px Arial';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = 6;
+        ctx.fillText(em.char, em.x, em.y);
+        ctx.restore();
+      }
     }
   }
 }

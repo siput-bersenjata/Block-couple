@@ -259,6 +259,8 @@
       this.camera.y = 0;
       this.camera.targetX = 0;
       this.camera.tilt = 0;
+      this.particles = [];
+      this.floatingTexts = [];
 
       // P1 & P2 Spaceships
       this.myPlayer.x = this.localSlot === 1 ? 320 : 600;
@@ -294,7 +296,7 @@
       }
 
       this.spawnAlienWave();
-      this.addFloatingText(480, 260, (this.gameTitle || 'DUO SPACE BLASTER').toUpperCase(), '#00e5ff', 28);
+      this.addFloatingText(480, 180, (this.gameTitle || 'DUO SPACE BLASTER').toUpperCase(), '#00e5ff', 24, 0.9);
     };
 
     GameEngine.prototype.spawnAlienWave = function () {
@@ -602,6 +604,8 @@
       this.camera.y = 0;
       this.camera.targetX = 0;
       this.camera.tilt = 0;
+      this.particles = [];
+      this.floatingTexts = [];
 
       // P1 & P2 Tanks
       this.myPlayer.x = this.localSlot === 1 ? 120 : 120;
@@ -740,7 +744,7 @@
         });
       }
 
-      this.addFloatingText(480, 260, `DUO TANK: LEVEL ${level} (${diffName.toUpperCase()})`, '#00e5ff', 28);
+      this.addFloatingText(480, 180, `DUO TANK: LEVEL ${level} (${diffName.toUpperCase()})`, '#00e5ff', 24, 0.9);
     };
 
     GameEngine.prototype.updateTank = function (dt) {
@@ -1193,6 +1197,8 @@
       this.camera.y = 0;
       this.camera.targetX = 0;
       this.camera.tilt = 0;
+      this.particles = [];
+      this.floatingTexts = [];
 
       // P1 & P2 Spawn Points - Open, spacious bottom runway below the ghost house
       // 74px vertical clearance from ghost house and boundary, 160px horizontal clearance from divider walls
@@ -1282,7 +1288,7 @@
         { x: 870, y: 465 }
       ];
 
-      this.addFloatingText(480, 260, (this.gameTitle || 'DUO PAC-MAZE').toUpperCase(), '#ffd700', 28);
+      this.addFloatingText(480, 180, (this.gameTitle || 'DUO PAC-MAZE').toUpperCase(), '#ffd700', 24, 0.9);
     };
 
     GameEngine.prototype.updatePacman = function (dt) {
@@ -1818,6 +1824,8 @@
       this.camera.y = 0;
       this.camera.targetX = 0;
       this.camera.tilt = 0;
+      this.particles = [];
+      this.floatingTexts = [];
 
       this.myPlayer.x = 200;
       this.myPlayer.y = 380;
@@ -1834,7 +1842,7 @@
       };
 
       this.nextMathQuestion();
-      this.addFloatingText(480, 260, (this.gameTitle || 'KUIS MATEMATIKA CO-OP').toUpperCase(), '#c084fc', 28);
+      this.addFloatingText(480, 180, (this.gameTitle || 'KUIS MATEMATIKA CO-OP').toUpperCase(), '#c084fc', 24, 0.9);
     };
 
     GameEngine.prototype.nextMathQuestion = function () {
@@ -2031,10 +2039,15 @@
       const cellSize = 20;
       this.snake = {
         cellSize: cellSize,
-        stepTimer: 0,
         stepInterval: 0.11,
         score: 0,
         stars: [],
+        timeLeft: 60, // 1 minute match duration
+        gameOver: false,
+        winner: null,
+        winnerText: '',
+        winnerColor: '#ffd700',
+        restartCooldown: 1.0,
         minX: 3,
         maxX: 44,
         minY: 3,
@@ -2051,7 +2064,18 @@
           color: '#00e5ff',
           name: 'Bobi',
           type: 'bobi',
-          length: 4
+          length: 4,
+          score: 0,
+          stepTimer: 0,
+          isTurbo: false,
+          invulnerableTimer: 0,
+          spawnBody: [
+            { x: 12, y: 13 },
+            { x: 11, y: 13 },
+            { x: 10, y: 13 },
+            { x: 9, y: 13 }
+          ],
+          spawnDir: { x: 1, y: 0 }
         },
         p2: {
           body: [
@@ -2065,14 +2089,45 @@
           color: '#ff3b77',
           name: 'Bona',
           type: 'bona',
-          length: 4
+          length: 4,
+          score: 0,
+          stepTimer: 0,
+          isTurbo: false,
+          invulnerableTimer: 0,
+          spawnBody: [
+            { x: 35, y: 13 },
+            { x: 36, y: 13 },
+            { x: 37, y: 13 },
+            { x: 38, y: 13 }
+          ],
+          spawnDir: { x: -1, y: 0 }
         }
       };
 
       // Spawn initial energy stars
       this.spawnSnakeStars(5);
 
-      this.addFloatingText(480, 260, (this.gameTitle || 'DUO SNAKE: PEMBURU BINTANG ENERGI').toUpperCase(), '#00e5ff', 28);
+      this.addFloatingText(480, 180, (this.gameTitle || 'DUO SNAKE: PEMBURU BINTANG ENERGI').toUpperCase(), '#00e5ff', 24, 0.9);
+    };
+
+    GameEngine.prototype.respawnSnake = function (snk) {
+      const s = this.snake;
+      if (!s) return;
+
+      // Reset snake body back to initial spawn segments and length 4
+      snk.body = snk.spawnBody.map(seg => ({ ...seg }));
+      snk.dir = { ...snk.spawnDir };
+      snk.nextDir = { ...snk.spawnDir };
+      snk.length = 4;
+      snk.stepTimer = 0;
+      snk.invulnerableTimer = 2.0; // 2 seconds safety shield after respawn
+
+      // Note: snk.score is intentionally PRESERVED (skor tetap tidak berubah)
+
+      const head = snk.body[0];
+      const px = head.x * s.cellSize + s.cellSize / 2;
+      const py = head.y * s.cellSize + s.cellSize / 2;
+      this.createCoinParticles(px, py, snk.color);
     };
 
     GameEngine.prototype.spawnSnakeStars = function (count) {
@@ -2111,11 +2166,62 @@
       const s = this.snake;
       if (!s) return;
 
-      // CRITICAL: Update particle effects and floating text animations so they fade out and disappear!
+      // Update particle effects and floating text animations so they fade out and disappear
       this.updateParticles(dt);
+
+      // Handle Game Over state & restart triggers
+      if (s.gameOver) {
+        if (s.restartCooldown > 0) {
+          s.restartCooldown -= dt;
+        } else {
+          const tryRestart = this.keysDown['r'] || this.keysDown['enter'] || this.keysDown[' '] ||
+            this.touchState.place || this.touchState.jump;
+          if (tryRestart) {
+            this.touchState.place = false;
+            this.touchState.jump = false;
+            this.initSnakeMode(this.currentLevelIndex || 0);
+            return;
+          }
+        }
+        return;
+      }
+
+      // Decrement 1-minute match timer
+      s.timeLeft -= dt;
+      if (s.timeLeft <= 0) {
+        s.timeLeft = 0;
+        s.gameOver = true;
+        s.restartCooldown = 1.0;
+
+        if (s.p1.score > s.p2.score) {
+          s.winner = 'bobi';
+          s.winnerText = 'BOBI MENANG!';
+          s.winnerColor = s.p1.color;
+        } else if (s.p2.score > s.p1.score) {
+          s.winner = 'bona';
+          s.winnerText = 'BONA MENANG!';
+          s.winnerColor = s.p2.color;
+        } else {
+          s.winner = 'draw';
+          s.winnerText = 'PERTANDINGAN SERI!';
+          s.winnerColor = '#ffd700';
+        }
+
+        if (window.audioManager && typeof window.audioManager.playLevelComplete === 'function') {
+          try { window.audioManager.playLevelComplete(); } catch (e) { }
+        }
+        if (typeof this.createVictoryConfetti === 'function') {
+          this.createVictoryConfetti();
+        }
+        return;
+      }
 
       const mySnake = this.localSlot === 1 ? s.p1 : s.p2;
       const peerSnake = this.localSlot === 1 ? s.p2 : s.p1;
+
+      // Update invulnerability shields
+      if (s.p1.invulnerableTimer > 0) s.p1.invulnerableTimer -= dt;
+      if (s.p2.invulnerableTimer > 0) s.p2.invulnerableTimer -= dt;
 
       // Local player steering
       let nd = mySnake.nextDir;
@@ -2130,18 +2236,18 @@
       }
       mySnake.nextDir = nd;
 
-      // Broadcast steering to peer player in multiplayer
+      // Local player INDEPENDENT TURBO (does NOT affect the other snake!)
+      mySnake.isTurbo = !!(this.keysDown['shift'] || this.keysDown[' '] || this.touchState.place);
+
+      // Broadcast steering and turbo state to peer player in multiplayer
       if (window.networkManager && typeof window.networkManager.emitPlayerUpdate === 'function') {
         window.networkManager.emitPlayerUpdate({
-          snakeDir: mySnake.nextDir
+          snakeDir: mySnake.nextDir,
+          snakeTurbo: mySnake.isTurbo
         });
       }
 
-      // Turbo boost when holding place button or shift
-      const isTurbo = this.keysDown['shift'] || this.keysDown[' '] || this.touchState.place;
-      const stepSpeed = isTurbo ? s.stepInterval * 0.55 : s.stepInterval;
-
-      // Autonomous partner AI steering toward nearest star when playing solo
+      // Autonomous partner AI steering and turbo when playing solo
       if (!this.peerPlayer.connected) {
         if (s.stars.length > 0) {
           const head = peerSnake.body[0];
@@ -2157,24 +2263,37 @@
           else if (closest.y > head.y && peerSnake.dir.y !== -1) pd = { x: 0, y: 1 };
           else if (closest.y < head.y && peerSnake.dir.y !== 1) pd = { x: 0, y: -1 };
           peerSnake.nextDir = pd;
+
+          // AI only triggers turbo if chasing a mega star within close range
+          peerSnake.isTurbo = closest.isMega && minDist < 6;
         }
       }
 
-      s.stepTimer += dt;
-      if (s.stepTimer >= stepSpeed) {
-        s.stepTimer = 0;
+      // 1. Advance P1 step timer independently
+      const p1Interval = s.p1.isTurbo ? s.stepInterval * 0.55 : s.stepInterval;
+      s.p1.stepTimer += dt;
+      if (s.p1.stepTimer >= p1Interval) {
+        s.p1.stepTimer = 0;
+        this.stepOneSnake(s.p1);
+      }
 
-        this.stepOneSnake(mySnake);
-        this.stepOneSnake(peerSnake);
+      // 2. Advance P2 step timer independently
+      const p2Interval = s.p2.isTurbo ? s.stepInterval * 0.55 : s.stepInterval;
+      s.p2.stepTimer += dt;
+      if (s.p2.stepTimer >= p2Interval) {
+        s.p2.stepTimer = 0;
+        this.stepOneSnake(s.p2);
+      }
 
-        if (s.stars.length < 4) {
-          this.spawnSnakeStars(2);
-        }
+      if (s.stars.length < 5) {
+        this.spawnSnakeStars(2);
       }
     };
 
     GameEngine.prototype.stepOneSnake = function (snk) {
       const s = this.snake;
+      if (!s || s.gameOver) return;
+
       snk.dir = snk.nextDir;
       const head = snk.body[0];
       let newHead = { x: head.x + snk.dir.x, y: head.y + snk.dir.y };
@@ -2184,6 +2303,30 @@
       if (newHead.x > s.maxX) newHead.x = s.minX;
       if (newHead.y < s.minY) newHead.y = s.maxY;
       if (newHead.y > s.maxY) newHead.y = s.minY;
+
+      // Check collision with opponent's body
+      const opponent = (snk === s.p1) ? s.p2 : s.p1;
+      if (snk.invulnerableTimer <= 0) {
+        let hitOpponent = false;
+        for (let i = 0; i < opponent.body.length; i++) {
+          if (opponent.body[i].x === newHead.x && opponent.body[i].y === newHead.y) {
+            hitOpponent = true;
+            break;
+          }
+        }
+
+        if (hitOpponent) {
+          const px = newHead.x * s.cellSize + s.cellSize / 2;
+          const py = newHead.y * s.cellSize + s.cellSize / 2;
+          this.createExplosion(px, py, snk.color, 18);
+          this.addFloatingText(px, py - 14, `${snk.name.toUpperCase()} RESPAWN!`, '#ff1744', 22);
+          if (window.audioManager && typeof window.audioManager.playEnemyDefeat === 'function') {
+            try { window.audioManager.playEnemyDefeat(); } catch (e) { }
+          }
+          this.respawnSnake(snk);
+          return;
+        }
+      }
 
       // Check star collision
       let eatenIdx = -1;
@@ -2197,6 +2340,7 @@
       if (eatenIdx !== -1) {
         const star = s.stars[eatenIdx];
         s.stars.splice(eatenIdx, 1);
+        snk.score += star.points;
         s.score += star.points;
         snk.length += star.isMega ? 2 : 1;
 
@@ -2260,20 +2404,100 @@
       this.renderParticles(ctx);
       this.renderFloatingTexts(ctx);
 
-      // Modern Never-Cut-Off Canvas HUD
+      // 1-Minute Match Timer Calculation
+      const secs = Math.max(0, Math.ceil(s.timeLeft));
+      const minsStr = Math.floor(secs / 60).toString();
+      const secsStr = (secs % 60).toString().padStart(2, '0');
+
+      // Modern Canvas HUD with Independent Player Scores & 60s Timer
       this.renderCanvasHUD({
-        leftBadge: `BOBI: ${s.p1.length}  |  BONA: ${s.p2.length}`,
-        leftColor: '#00e5ff',
-        centerBadge: (this.gameTitle || 'DUO SNAKE').toUpperCase(),
-        centerColor: '#22c55e',
-        rightBadge: `SKOR: ${s.score} PTS`,
-        rightColor: '#ffd700'
+        leftBadge: `BOBI: ${s.p1.score} PTS (${s.p1.length} SEG)${s.p1.isTurbo ? ' ⚡' : ''}`,
+        leftColor: s.p1.isTurbo ? '#38bdf8' : '#00e5ff',
+        centerBadge: `⏱️ ${minsStr}:${secsStr}`,
+        centerColor: secs <= 10 ? '#ef4444' : '#ffd700',
+        rightBadge: `BONA: ${s.p2.score} PTS (${s.p2.length} SEG)${s.p2.isTurbo ? ' ⚡' : ''}`,
+        rightColor: s.p2.isTurbo ? '#f43f5e' : '#ff3b77'
       });
+
+      // Match Finished Game Over Modal with Winner Announcement
+      if (s.gameOver) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(6, 10, 22, 0.88)';
+        ctx.fillRect(0, 0, 960, 540);
+
+        const cx = 480;
+        const cy = 270;
+        const modalW = 540;
+        const modalH = 320;
+
+        // Glowing Victory Card Box
+        ctx.fillStyle = '#0b1329';
+        ctx.strokeStyle = s.winnerColor;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = s.winnerColor;
+        ctx.shadowBlur = 24;
+        ctx.beginPath();
+        drawRoundRect(ctx, cx - modalW / 2, cy - modalH / 2, modalW, modalH, 18);
+        ctx.fill();
+        ctx.stroke();
+
+        // Top Tag
+        ctx.textAlign = 'center';
+        ctx.shadowBlur = 0;
+        ctx.font = '800 15px Outfit, sans-serif';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText('DUO SNAKE • WAKTU 1 MENIT BERAKHIR', cx, cy - 105);
+
+        // Winner Announcement Title
+        ctx.font = '900 36px Outfit, sans-serif';
+        ctx.fillStyle = s.winnerColor;
+        ctx.shadowColor = s.winnerColor;
+        ctx.shadowBlur = 16;
+        ctx.fillText(s.winnerText, cx, cy - 50);
+
+        // Score Breakdown Table
+        ctx.shadowBlur = 0;
+
+        // P1 Bobi Card
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.12)';
+        ctx.beginPath();
+        drawRoundRect(ctx, cx - 230, cy - 15, 210, 70, 10);
+        ctx.fill();
+        ctx.font = '700 18px Outfit, sans-serif';
+        ctx.fillStyle = '#00e5ff';
+        ctx.fillText('BOBI (CYAN)', cx - 125, cy + 12);
+        ctx.font = '800 22px Outfit, sans-serif';
+        ctx.fillText(`${s.p1.score} PTS (${s.p1.length} seg)`, cx - 125, cy + 40);
+
+        // P2 Bona Card
+        ctx.fillStyle = 'rgba(255, 59, 119, 0.12)';
+        ctx.beginPath();
+        drawRoundRect(ctx, cx + 20, cy - 15, 210, 70, 10);
+        ctx.fill();
+        ctx.font = '700 18px Outfit, sans-serif';
+        ctx.fillStyle = '#ff3b77';
+        ctx.fillText('BONA (PINK)', cx + 125, cy + 12);
+        ctx.font = '800 22px Outfit, sans-serif';
+        ctx.fillText(`${s.p2.score} PTS (${s.p2.length} seg)`, cx + 125, cy + 40);
+
+        // Play Again Prompt
+        ctx.font = '600 15px Outfit, sans-serif';
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillText('Tekan [SPASI] / [R] atau Sentuh Layar untuk Main Lagi', cx, cy + 115);
+        ctx.restore();
+      }
     };
 
     GameEngine.prototype.drawOneSnake = function (ctx, snk) {
       const s = this.snake;
       const cs = s.cellSize;
+
+      // Invulnerability blink effect after respawn
+      if (snk.invulnerableTimer > 0) {
+        if (Math.floor(Date.now() / 120) % 2 === 0) {
+          return;
+        }
+      }
 
       // Draw Body Segments (tail to head-1)
       for (let i = snk.body.length - 1; i >= 1; i--) {
@@ -2286,7 +2510,7 @@
         ctx.fillStyle = snk.color;
         ctx.globalAlpha = alpha;
         ctx.shadowColor = snk.color;
-        ctx.shadowBlur = 6;
+        ctx.shadowBlur = snk.isTurbo ? 10 : 6;
         ctx.beginPath();
         drawRoundRect(ctx, segX + 2, segY + 2, cs - 4, cs - 4, 5);
         ctx.fill();
@@ -2301,7 +2525,7 @@
       ctx.save();
       ctx.fillStyle = snk.color;
       ctx.shadowColor = snk.color;
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = snk.isTurbo ? 22 : 12;
       ctx.beginPath();
       drawRoundRect(ctx, hx + 1, hy + 1, cs - 2, cs - 2, 6);
       ctx.fill();
@@ -2366,6 +2590,8 @@
       this.camera.y = 0;
       this.camera.targetX = 0;
       this.camera.tilt = 0;
+      this.particles = [];
+      this.floatingTexts = [];
 
       this.pong = {
         p1: { x: 50, y: 270, w: 18, h: 90, vy: 0, color: '#00e5ff', name: 'Bobi', type: 'bobi' },
@@ -2384,7 +2610,7 @@
         trail: []
       };
 
-      this.addFloatingText(480, 260, (this.gameTitle || 'NEON PONG: PERTARUNGAN REFLEKS').toUpperCase(), '#00e5ff', 28);
+      this.addFloatingText(480, 180, (this.gameTitle || 'NEON PONG: PERTARUNGAN REFLEKS').toUpperCase(), '#00e5ff', 24, 0.9);
     };
 
     GameEngine.prototype.updatePong = function (dt) {
@@ -2431,17 +2657,19 @@
         this.createCoinParticles(b.x, b.y, '#ff3b77');
       }
 
-      // Paddle Collisions (Left & Right)
+      // Paddle Collisions (Left & Right) with instant position separation
       if (b.vx < 0 && b.x - b.radius <= p.p1.x + p.p1.w / 2 && b.x + b.radius >= p.p1.x - p.p1.w / 2) {
         if (Math.abs(b.y - p.p1.y) <= p.p1.h / 2 + b.radius) {
           b.vx = Math.abs(b.vx) * 1.05;
+          b.x = p.p1.x + p.p1.w / 2 + b.radius + 2;
           const hitOffset = (b.y - p.p1.y) / (p.p1.h / 2);
           b.vy = hitOffset * 320;
           p.rally++;
           p.score += 10 * p.rally;
           this.createCoinParticles(b.x, b.y, '#00e5ff');
           if (p.rally % 5 === 0) {
-            this.addFloatingText(b.x, b.y - 18, `RELI x${p.rally}!`, '#00e5ff', 22);
+            // Elegant top-center rally banner that dissolves smoothly without blocking the paddle
+            this.addFloatingText(480, 85, `RELI x${p.rally}!`, '#00e5ff', 24, 0.9);
           }
         }
       }
@@ -2449,13 +2677,15 @@
       if (b.vx > 0 && b.x + b.radius >= p.p2.x - p.p2.w / 2 && b.x - b.radius <= p.p2.x + p.p2.w / 2) {
         if (Math.abs(b.y - p.p2.y) <= p.p2.h / 2 + b.radius) {
           b.vx = -Math.abs(b.vx) * 1.05;
+          b.x = p.p2.x - p.p2.w / 2 - b.radius - 2;
           const hitOffset = (b.y - p.p2.y) / (p.p2.h / 2);
           b.vy = hitOffset * 320;
           p.rally++;
           p.score += 10 * p.rally;
           this.createCoinParticles(b.x, b.y, '#ff3b77');
           if (p.rally % 5 === 0) {
-            this.addFloatingText(b.x, b.y - 18, `RELI x${p.rally}!`, '#ff3b77', 22);
+            // Elegant top-center rally banner that dissolves smoothly without blocking the paddle
+            this.addFloatingText(480, 85, `RELI x${p.rally}!`, '#ff3b77', 24, 0.9);
           }
         }
       }
@@ -2468,7 +2698,7 @@
         b.y = 270;
         b.vx = 380 * (Math.random() > 0.5 ? 1 : -1);
         b.vy = 180 * (Math.random() > 0.5 ? 1 : -1);
-        this.addFloatingText(480, 240, 'RELI BARU!', '#ffd700', 22);
+        this.addFloatingText(480, 200, 'RELI BARU!', '#ffd700', 20, 0.8);
       }
 
       this.updateParticles(dt);
