@@ -1026,6 +1026,7 @@ class NetworkManager {
         this.game.loadLevel(levelIdx, levelStart, restorePos);
       }
       this.game.start();
+      window.gameEngine = this.game;
     } else {
       this.game.setSlot(slot);
       this.game.myPlayer.name = this.username;
@@ -1034,6 +1035,7 @@ class NetworkManager {
       } else {
         this.game.loadLevel(levelIdx, levelStart, restorePos);
       }
+      window.gameEngine = this.game;
     }
 
     this.updateRoomBadgeCount(players.length);
@@ -1369,6 +1371,7 @@ class NetworkManager {
         this.game.loadLevel(levelIndex, levelStart);
       }
       this.game.start();
+      window.gameEngine = this.game;
     } else {
       this.game.setSlot(this.slot);
       this.game.myPlayer.name = this.username;
@@ -1377,6 +1380,7 @@ class NetworkManager {
       } else {
         this.game.loadLevel(levelIndex, levelStart);
       }
+      window.gameEngine = this.game;
     }
 
     if (this.partnerName && this.game.peerPlayer) {

@@ -68,6 +68,36 @@
       }
     };
 
+    // Shared explosion particle generator
+    GameEngine.prototype.createExplosion = function(x, y, color = '#ffd700', count = 14) {
+      if (!this.particles) this.particles = [];
+      const n = count || 14;
+      for (let i = 0; i < n; i++) {
+        const angle = (Math.PI * 2 / n) * i + (Math.random() - 0.5) * 0.4;
+        const speed = 2 + Math.random() * 4;
+        this.particles.push({
+          type: 'spark',
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          color: color || '#ffd700',
+          radius: 2.5 + Math.random() * 2,
+          alpha: 1,
+          life: 0.5 + Math.random() * 0.4
+        });
+      }
+      if (window.audioManager) {
+        try {
+          if (typeof window.audioManager.playExplosion === 'function') {
+            window.audioManager.playExplosion();
+          } else if (typeof window.audioManager.playEnemyDefeat === 'function') {
+            window.audioManager.playEnemyDefeat();
+          }
+        } catch(e) {}
+      }
+    };
+
     // Update Touch Controls & HUD text for each mode
     GameEngine.prototype.updateModeControls = function() {
       const btnJump = document.getElementById('btnJump');
@@ -226,7 +256,12 @@
         // Dual laser
         s.lasers.push({ x: this.myPlayer.x - 12, y: this.myPlayer.y - 10, vy: -650, color, owner: this.localSlot });
         s.lasers.push({ x: this.myPlayer.x + 12, y: this.myPlayer.y - 10, vy: -650, color, owner: this.localSlot });
-        window.audioManager && window.audioManager.jump();
+        if (window.audioManager) {
+          try {
+            if (typeof window.audioManager.playLaser === 'function') window.audioManager.playLaser();
+            else if (typeof window.audioManager.playJump === 'function') window.audioManager.playJump();
+          } catch(e) {}
+        }
       }
 
       // Update Lasers
@@ -247,7 +282,9 @@
               s.aliens.splice(j, 1);
               s.score += 100;
               this.addFloatingText(a.x, a.y - 10, '+100', '#ffd700', 18);
-              window.audioManager && window.audioManager.stomp();
+              if (window.audioManager && typeof window.audioManager.playEnemyDefeat === 'function') {
+                try { window.audioManager.playEnemyDefeat(); } catch(e) {}
+              }
             } else {
               this.createExplosion(a.x, a.y, '#ffd700', 6);
             }
@@ -294,7 +331,9 @@
         s.waveTimer = 3;
         this.addFloatingText(480, 240, 'WAVE BERSIH! +500 PTS', '#00e5ff', 32);
         s.score += 500;
-        window.audioManager && window.audioManager.portal();
+        if (window.audioManager && typeof window.audioManager.playDoorOpen === 'function') {
+          try { window.audioManager.playDoorOpen(); } catch(e) {}
+        }
       }
 
       if (s.waveCleared) {
@@ -547,7 +586,12 @@
           bounces: 1,
           owner: this.localSlot
         });
-        window.audioManager && window.audioManager.bump();
+        if (window.audioManager) {
+          try {
+            if (typeof window.audioManager.playLaser === 'function') window.audioManager.playLaser();
+            else if (typeof window.audioManager.playSpringBounce === 'function') window.audioManager.playSpringBounce();
+          } catch(e) {}
+        }
       }
 
       // Update Shells
@@ -587,7 +631,9 @@
             t.enemyTanks.splice(k, 1);
             t.score += 250;
             this.addFloatingText(e.x, e.y - 10, '+250 TANK HANCUR!', '#ffd700', 20);
-            window.audioManager && window.audioManager.stomp();
+            if (window.audioManager && typeof window.audioManager.playEnemyDefeat === 'function') {
+              try { window.audioManager.playEnemyDefeat(); } catch(e) {}
+            }
             break;
           }
         }
@@ -785,7 +831,9 @@
           p.score += 50;
           p.frightenedTimer = 8; // 8 seconds of frightened ghosts
           this.addFloatingText(pp.x, pp.y, 'POWER UP! HANTU BIRU!', '#00e5ff', 24);
-          window.audioManager && window.audioManager.portal();
+          if (window.audioManager && typeof window.audioManager.playDoorOpen === 'function') {
+            try { window.audioManager.playDoorOpen(); } catch(e) {}
+          }
           break;
         }
       }
@@ -807,7 +855,9 @@
             g.y = 240;
             p.score += 200;
             this.addFloatingText(this.myPlayer.x, this.myPlayer.y - 10, '+200 HANTU TERMAKAN!', '#00e5ff', 22);
-            window.audioManager && window.audioManager.stomp();
+            if (window.audioManager && typeof window.audioManager.playEnemyDefeat === 'function') {
+              try { window.audioManager.playEnemyDefeat(); } catch(e) {}
+            }
           }
         }
       }
@@ -1024,13 +1074,17 @@
             m.score += bonus;
             this.addFloatingText(p.x, p.y - 40, `BENAR! +${bonus}`, '#10b981', 26);
             this.createExplosion(p.x, p.y, '#10b981', 20);
-            window.audioManager && window.audioManager.portal();
+            if (window.audioManager && typeof window.audioManager.playDoorOpen === 'function') {
+              try { window.audioManager.playDoorOpen(); } catch(e) {}
+            }
             this.nextMathQuestion();
           } else {
             m.streak = 0;
             this.addFloatingText(p.x, p.y - 40, 'KURANG TEPAT!', '#ef4444', 22);
             this.createExplosion(p.x, p.y, '#ef4444', 12);
-            window.audioManager && window.audioManager.hurt();
+            if (window.audioManager && typeof window.audioManager.playHurt === 'function') {
+              try { window.audioManager.playHurt(); } catch(e) {}
+            }
             this.nextMathQuestion();
           }
           break;

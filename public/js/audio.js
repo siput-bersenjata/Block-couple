@@ -248,6 +248,56 @@ class AudioManager {
     } catch(e) {}
   }
 
+  playLaser() {
+    if (this.muted) return;
+    this.init();
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(880, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(110, this.ctx.currentTime + 0.12);
+
+      gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.13);
+    } catch(e) {}
+  }
+
+  playExplosion() {
+    if (this.muted) return;
+    this.init();
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(40, this.ctx.currentTime + 0.25);
+
+      gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.26);
+    } catch(e) {}
+  }
+
+  // Safe Aliases for backward/mode compatibility
+  jump() { try { this.playJump(); } catch(e) {} }
+  bump() { try { this.playSpringBounce(); } catch(e) {} }
+  stomp() { try { this.playEnemyDefeat(); } catch(e) {} }
+  portal() { try { this.playDoorOpen(); } catch(e) {} }
+  hurt() { try { this.playHurt(); } catch(e) {} }
+  laser() { try { this.playLaser(); } catch(e) {} }
+  shoot() { try { this.playLaser(); } catch(e) {} }
+  explosion() { try { this.playExplosion(); } catch(e) {} }
+
   startBGM() {
     if (this.bgmPlaying || this.muted) return;
     this.init();
