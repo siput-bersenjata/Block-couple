@@ -18,10 +18,20 @@
 
     // --- Master Mode Switcher ---
     GameEngine.prototype.loadGame = function(gameId, levelIndex = 0, startTime = Date.now(), restorePos = null) {
-      this.currentGameId = gameId || 1;
-      const gameDef = (window.COOP_GAMES || []).find(g => g.id === this.currentGameId) || window.COOP_GAMES[0];
+      this.currentGameId = Number(gameId) || 1;
+      const gameDef = (window.COOP_GAMES || []).find(g => Number(g.id) === this.currentGameId) || window.COOP_GAMES[0];
       this.gameMode = gameDef ? (gameDef.mode || 'platformer') : 'platformer';
       this.gameTitle = gameDef ? gameDef.title : 'Petualangan Co-op';
+
+      // Clear all prior mode states so no residual objects or banners linger
+      this.floatingTexts = [];
+      this.particles = [];
+      this.shooter = null;
+      this.tank = null;
+      this.pacman = null;
+      this.math = null;
+      this.pong = null;
+      this.snake = null;
 
       // Update HUD Labels based on mode
       this.updateModeControls();
@@ -29,6 +39,16 @@
       // Update in-game HUD Level Title
       const titleEl = document.getElementById('levelTitle');
       if (titleEl) titleEl.innerText = this.gameTitle;
+
+      // Toggle key tracker visibility
+      const keyTracker = document.getElementById('keyTracker');
+      if (keyTracker) {
+        if (this.gameMode === 'platformer') {
+          keyTracker.classList.remove('hidden');
+        } else {
+          keyTracker.classList.add('hidden');
+        }
+      }
 
       if (this.gameMode === 'shooter') {
         this.initShooterMode(levelIndex);
@@ -149,7 +169,7 @@
       }
 
       this.spawnAlienWave();
-      this.addFloatingText(480, 260, 'DUO SPACE BLASTER: WAVE ' + this.shooter.wave, '#00e5ff', 32);
+      this.addFloatingText(480, 260, (this.gameTitle || 'DUO SPACE BLASTER').toUpperCase(), '#00e5ff', 28);
     };
 
     GameEngine.prototype.spawnAlienWave = function() {
@@ -487,7 +507,7 @@
         { x: 800, y: 400, angle: Math.PI, vx: 0, vy: -50, shootTimer: 3 }
       );
 
-      this.addFloatingText(480, 260, 'DUO TANK BAJA: BENTENG TEMPUR', '#00e5ff', 32);
+      this.addFloatingText(480, 260, (this.gameTitle || 'DUO TANK BAJA').toUpperCase(), '#00e5ff', 28);
     };
 
     GameEngine.prototype.updateTank = function(dt) {
@@ -940,7 +960,7 @@
       };
 
       this.nextMathQuestion();
-      this.addFloatingText(480, 260, 'KUIS MATEMATIKA CO-OP!', '#00e5ff', 32);
+      this.addFloatingText(480, 260, (this.gameTitle || 'KUIS MATEMATIKA CO-OP').toUpperCase(), '#c084fc', 28);
     };
 
     GameEngine.prototype.nextMathQuestion = function() {

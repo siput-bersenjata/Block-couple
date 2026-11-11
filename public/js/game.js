@@ -955,7 +955,12 @@ class GameEngine {
   updateKeyUI() {
     const keyContainer = document.getElementById('keyTracker');
     if (!keyContainer) return;
-    const total = this.currentLevel.keys.length;
+    if (this.gameMode && this.gameMode !== 'platformer') {
+      keyContainer.classList.add('hidden');
+      return;
+    }
+    keyContainer.classList.remove('hidden');
+    const total = (this.currentLevel && this.currentLevel.keys) ? this.currentLevel.keys.length : 0;
     const collected = this.collectedKeys.length;
     keyContainer.innerHTML = `Kunci: <b>${collected} / ${total}</b>`;
   }

@@ -51,8 +51,16 @@ app.post('/api/game-played', (req, res) => {
   res.json({ success: true, gamesPlayed: totalGamesPlayedCount });
 });
 
-// Serve static assets
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static assets with no-cache headers so code updates take effect instantly
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
 
 // Root & fallback route
 app.get('/', (req, res) => {
