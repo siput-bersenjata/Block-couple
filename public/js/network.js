@@ -32,6 +32,12 @@ class NetworkManager {
     this.exitVoteSecondsLeft = 5;
     this.exitVoteActive = false;
 
+    // Catalog & Score tracking state
+    this.inCatalog = true;
+    this.partnerName = '';
+    this.scores = { p1: 0, p2: 0 };
+    this.loadSavedScores();
+
     this.init();
   }
 
@@ -125,12 +131,32 @@ class NetworkManager {
         username: this.username,
         levelIndex: levelIndex,
         isPublic: this.isPublic,
+        inCatalog: !!this.inCatalog,
+        scores: this.scores,
         timestamp: Date.now()
       };
       sessionStorage.setItem('bc_session', JSON.stringify(sessionData));
     } catch (e) {
       console.warn('Failed to save session:', e);
     }
+  }
+
+  loadSavedScores() {
+    try {
+      const raw = sessionStorage.getItem('bc_scores');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.p1 === 'number' && typeof parsed.p2 === 'number') {
+          this.scores = parsed;
+        }
+      }
+    } catch(e) {}
+  }
+
+  saveScores() {
+    try {
+      sessionStorage.setItem('bc_scores', JSON.stringify(this.scores));
+    } catch(e) {}
   }
 
   clearSession() {
@@ -170,13 +196,24 @@ class NetworkManager {
       this.isHost = session.isHost;
       this.slot = session.slot;
       this.isPublic = !!session.isPublic;
+      if (session.scores) this.scores = session.scores;
+
+      // If user refreshed while in the Game Catalog, stay in the Game Catalog!
+      if (session.inCatalog) {
+        if (this.isHost) {
+          this.resumeHostInCatalog(targetRoom, this.username);
+        } else {
+          this.resumeJoinerInCatalog(targetRoom, this.username);
+        }
+        return true;
+      }
 
       const savedPos = this.getLastSavedPosition();
 
       if (this.isHost) {
         this.resumeAsHost(targetRoom, this.username, session.levelIndex || 0, savedPos);
       } else {
-        this.joinRoom(targetRoom, this.username, true, session.levelIndex || 0, savedPos);
+        this.joinRoom(targetRoom, this.username, true, session.levelIndex || 0, savedPos, false);
       }
       return true;
     }
@@ -191,12 +228,37 @@ class NetworkManager {
     this.isHost = true;
     this.isPublic = false;
     this.slot = 1;
+    this.inCatalog = true;
 
     // Generate random 6-digit numeric room code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     this.roomCode = code;
 
-    this.startHostPeer(`bc2d-${code}`, 0, null);
+    console.log('[Network] Creating private 6-digit room, opening catalog:', this.roomCode);
+    this.startHostPeer(`bc2d-${code}`, 0, null, true);
+  }
+
+  resumeHostInCatalog(roomCode, username) {
+    this.username = username || 'Bobi';
+    this.isHost = true;
+    this.isPublic = false;
+    this.slot = 1;
+    this.inCatalog = true;
+    this.roomCode = roomCode;
+
+    console.log('[Network] Re-hosting catalog room after refresh:', roomCode);
+    this.startHostPeer(`bc2d-${roomCode}`, 0, null, true);
+  }
+
+  resumeJoinerInCatalog(roomCode, username) {
+    this.username = username || 'Bona';
+    this.isHost = false;
+    this.slot = 2;
+    this.inCatalog = true;
+    this.roomCode = roomCode;
+
+    console.log('[Network] Re-joining catalog room after refresh:', roomCode);
+    this.joinRoom(roomCode, username, true, 0, null, true);
   }
 
   resumeAsHost(roomCode, username, levelIdx = 0, restorePos = null) {
@@ -204,12 +266,13 @@ class NetworkManager {
     this.isHost = true;
     this.roomCode = roomCode;
     this.slot = 1;
+    this.inCatalog = false;
 
     console.log('[Network] Re-hosting room after refresh at last position:', roomCode, restorePos);
-    this.startHostPeer(`bc2d-${roomCode}`, levelIdx, restorePos);
+    this.startHostPeer(`bc2d-${roomCode}`, levelIdx, restorePos, false);
   }
 
-  startHostPeer(peerId, startLevelIdx = 0, restorePos = null) {
+  startHostPeer(peerId, startLevelIdx = 0, restorePos = null, openCatalogFirst = true) {
     if (this.peer) this.peer.destroy();
 
     this.updateConnectionBadge('connecting');
@@ -226,9 +289,15 @@ class NetworkManager {
     this.peer.on('open', (id) => {
       console.log('[Network] Host Peer active with ID:', id);
       this.updateConnectionBadge('connected');
-      this.onRoomReady(this.roomCode, 1, [
-        { slot: 1, name: this.username }
-      ], startLevelIdx, Date.now(), restorePos);
+      
+      if (openCatalogFirst) {
+        // OPEN GAME CATALOG FIRST! (As requested by user)
+        this.openGameCatalog(this.roomCode, 1, false);
+      } else {
+        this.onRoomReady(this.roomCode, 1, [
+          { slot: 1, name: this.username }
+        ], startLevelIdx, Date.now(), restorePos);
+      }
       this.saveSession(startLevelIdx);
     });
 
@@ -238,18 +307,30 @@ class NetworkManager {
       this.setupDataConnection();
 
       conn.on('open', () => {
-        const levelIdx = this.game ? this.game.currentLevelIndex : startLevelIdx;
-        const levelStart = this.game ? this.game.levelStartTime : Date.now();
-        this.send({
-          type: 'init-sync',
-          slot: 2,
-          hostName: this.username,
-          levelIndex: levelIdx,
-          levelStartTime: levelStart,
-          hostX: this.game ? this.game.myPlayer.x : null,
-          hostY: this.game ? this.game.myPlayer.y : null,
-          keys: this.game ? this.game.collectedKeys : []
-        });
+        if (this.inCatalog) {
+          this.updateCatalogPartner(this.partnerName || 'Bona', 2);
+          this.send({
+            type: 'catalog-sync',
+            p1Name: this.username,
+            p2Name: this.partnerName || 'Bona',
+            p1Score: this.scores.p1,
+            p2Score: this.scores.p2,
+            inCatalog: true
+          });
+        } else {
+          const levelIdx = this.game ? this.game.currentLevelIndex : startLevelIdx;
+          const levelStart = this.game ? this.game.levelStartTime : Date.now();
+          this.send({
+            type: 'init-sync',
+            slot: 2,
+            hostName: this.username,
+            levelIndex: levelIdx,
+            levelStartTime: levelStart,
+            hostX: this.game ? this.game.myPlayer.x : null,
+            hostY: this.game ? this.game.myPlayer.y : null,
+            keys: this.game ? this.game.collectedKeys : []
+          });
+        }
       });
     });
 
@@ -269,7 +350,7 @@ class NetworkManager {
   // ========================================================
   // JOIN ROOM (PRIVATE OR PUBLIC)
   // ========================================================
-  joinRoom(code, username, isResume = false, initialLevelIdx = 0, restorePos = null) {
+  joinRoom(code, username, isResume = false, initialLevelIdx = 0, restorePos = null, openCatalogFirst = true) {
     const cleanCode = (code || '').toString().trim();
     if (!cleanCode) {
       alert('Masukkan Kode Room yang valid!');
@@ -305,22 +386,31 @@ class NetworkManager {
         console.log('[Network] Connected to host!');
         this.updateConnectionBadge('connected');
         
-        const myX = restorePos ? restorePos.x : (this.game ? this.game.myPlayer.x : null);
-        const myY = restorePos ? restorePos.y : (this.game ? this.game.myPlayer.y : null);
+        if (openCatalogFirst) {
+          this.openGameCatalog(this.roomCode, 2, isResume);
+          this.send({
+            type: 'join-request',
+            name: this.username,
+            inCatalog: true
+          });
+        } else {
+          const myX = restorePos ? restorePos.x : (this.game ? this.game.myPlayer.x : null);
+          const myY = restorePos ? restorePos.y : (this.game ? this.game.myPlayer.y : null);
 
-        this.send({
-          type: 'join-request',
-          name: this.username,
-          joinerX: myX,
-          joinerY: myY
-        });
+          this.send({
+            type: 'join-request',
+            name: this.username,
+            joinerX: myX,
+            joinerY: myY
+          });
 
-        // If resuming on refresh, ready immediately at last position
-        if (isResume) {
-          this.onRoomReady(this.roomCode, 2, [
-            { slot: 1, name: 'Bobi' },
-            { slot: 2, name: this.username }
-          ], initialLevelIdx, Date.now(), restorePos);
+          // If resuming on refresh, ready immediately at last position
+          if (isResume) {
+            this.onRoomReady(this.roomCode, 2, [
+              { slot: 1, name: 'Bobi' },
+              { slot: 2, name: this.username }
+            ], initialLevelIdx, Date.now(), restorePos);
+          }
         }
         this.saveSession(initialLevelIdx);
       });
@@ -432,9 +522,11 @@ class NetworkManager {
         this.roomCode = 'Publik 1';
 
         this.setupDataConnection();
+        this.openGameCatalog(this.roomCode, 2, false);
         this.send({
           type: 'join-request',
-          name: this.username
+          name: this.username,
+          inCatalog: true
         });
       });
 
@@ -479,6 +571,7 @@ class NetworkManager {
       this.isHost = true;
       this.slot = 1;
       this.roomCode = 'Publik 1';
+      this.openGameCatalog(this.roomCode, 1, false);
     });
 
     this.peer.on('connection', (conn) => {
@@ -490,16 +583,14 @@ class NetworkManager {
       this.setupDataConnection();
 
       conn.on('open', () => {
-        this.onRoomReady(this.roomCode, 1, [
-          { slot: 1, name: this.username }
-        ], 0);
-
+        this.openGameCatalog(this.roomCode, 1, false);
         this.send({
-          type: 'init-sync',
-          slot: 2,
-          hostName: this.username,
-          levelIndex: 0,
-          levelStartTime: Date.now()
+          type: 'catalog-sync',
+          p1Name: this.username,
+          p2Name: this.partnerName || 'Bona',
+          p1Score: this.scores.p1,
+          p2Score: this.scores.p2,
+          inCatalog: true
         });
       });
     });
@@ -659,7 +750,20 @@ class NetworkManager {
         break;
 
       case 'join-request':
-        if (this.game) {
+        this.partnerName = data.name;
+        if (this.inCatalog) {
+          this.updateCatalogPartner(data.name, 2);
+          this.send({
+            type: 'catalog-sync',
+            p1Name: this.username,
+            p2Name: data.name,
+            p1Score: this.scores.p1,
+            p2Score: this.scores.p2,
+            inCatalog: true
+          });
+          window.audioManager && window.audioManager.playKey();
+          this.showToast(`${data.name} bergabung ke Room!`);
+        } else if (this.game) {
           this.game.peerPlayer.connected = true;
           this.game.peerPlayer.name = data.name;
           if (typeof data.joinerX === 'number' && typeof data.joinerY === 'number') {
@@ -683,6 +787,42 @@ class NetworkManager {
             hostY: this.game.myPlayer.y,
             keys: this.game.collectedKeys
           });
+        }
+        break;
+
+      case 'catalog-sync':
+        if (data.p1Name && this.slot === 2) {
+          this.partnerName = data.p1Name;
+        }
+        if (data.p2Name && this.slot === 1) {
+          this.partnerName = data.p2Name;
+        }
+        if (typeof data.p1Score === 'number' && typeof data.p2Score === 'number') {
+          this.scores.p1 = data.p1Score;
+          this.scores.p2 = data.p2Score;
+          this.saveScores();
+        }
+        if (this.inCatalog) {
+          this.updateCatalogPartner(this.partnerName, this.slot === 1 ? 2 : 1);
+          this.updateCatalogScoreDisplay();
+        }
+        break;
+
+      case 'launch-game':
+        this.startGame(data.gameId, data.levelIndex, data.levelStartTime);
+        break;
+
+      case 'return-to-catalog':
+        this.openGameCatalog(this.roomCode, this.slot, false);
+        this.showToast('Partner mengajak kembali ke Beranda Katalog Game');
+        break;
+
+      case 'score-update':
+        if (typeof data.p1 === 'number' && typeof data.p2 === 'number') {
+          this.scores.p1 = data.p1;
+          this.scores.p2 = data.p2;
+          this.saveScores();
+          this.updateCatalogScoreDisplay();
         }
         break;
 
@@ -874,9 +1014,7 @@ class NetworkManager {
   requestExitVote() {
     const isCoopConnected = this.game && this.game.peerPlayer && this.game.peerPlayer.connected && this.conn && this.conn.open;
     if (!isCoopConnected) {
-      if (confirm('Keluar dari Room dan kembali ke Beranda?')) {
-        this.leaveRoom();
-      }
+      this.returnToCatalog();
       return;
     }
 
@@ -970,14 +1108,14 @@ class NetworkManager {
   acceptExitVote() {
     this.send({ type: 'exit-vote-agreed' });
     this.closeExitVoteModal();
-    this.leaveRoom();
-    this.showToast('Kedua pemain setuju keluar ke Beranda');
+    this.returnToCatalog();
+    this.showToast('Kedua pemain kembali ke Katalog Game');
   }
 
   handleExitVoteAgreed() {
     this.closeExitVoteModal();
-    this.leaveRoom();
-    this.showToast('Kedua pemain setuju keluar ke Beranda');
+    this.openGameCatalog(this.roomCode, this.slot, false);
+    this.showToast('Kedua pemain kembali ke Katalog Game');
   }
 
   declineExitVote() {
@@ -1025,6 +1163,213 @@ class NetworkManager {
   }
 
   // ========================================================
+  // GAME CATALOG & SCORING SYSTEM
+  // ========================================================
+  openGameCatalog(code, slot, isResume = false) {
+    this.inCatalog = true;
+    this.roomCode = code;
+    this.slot = slot;
+
+    // Hide other screens
+    const lobbyModal = document.getElementById('lobbyModal');
+    if (lobbyModal) lobbyModal.classList.add('hidden');
+    this.hideMatchmakingModal();
+    const timeoutModal = document.getElementById('matchTimeoutModal');
+    if (timeoutModal) timeoutModal.classList.add('hidden');
+    const exitModal = document.getElementById('exitVoteModal');
+    if (exitModal) exitModal.classList.add('hidden');
+
+    const hud = document.getElementById('gameHud');
+    if (hud) hud.classList.add('hidden');
+
+    // Show Catalog Modal
+    const catalogModal = document.getElementById('catalogModal');
+    if (catalogModal) catalogModal.classList.remove('hidden');
+
+    // Update URL query param if private room
+    if (!this.isPublic && code && code !== 'Publik') {
+      const newUrl = `${window.location.origin}${window.location.pathname}?room=${code}`;
+      window.history.replaceState({ path: newUrl }, '', newUrl);
+    }
+
+    // Update Room Badge & Code display
+    const roomBadge = document.getElementById('catalogRoomBadge');
+    if (roomBadge) roomBadge.innerText = `Room: ${code}`;
+
+    const codeDisplay = document.getElementById('catalogRoomCodeDisplay');
+    if (codeDisplay) codeDisplay.innerText = code;
+
+    // Update Player Names
+    const p1NameEl = document.getElementById('catalogP1Name');
+    const p2NameEl = document.getElementById('catalogP2Name');
+    if (this.slot === 1) {
+      if (p1NameEl) p1NameEl.innerText = `${this.username} (Kamu)`;
+      if (p2NameEl) p2NameEl.innerText = this.partnerName ? `${this.partnerName}` : 'Menunggu Partner...';
+    } else {
+      if (p1NameEl) p1NameEl.innerText = this.partnerName ? `${this.partnerName}` : 'Bobi';
+      if (p2NameEl) p2NameEl.innerText = `${this.username} (Kamu)`;
+    }
+
+    // Update Partner connection status & invite banner
+    this.updateCatalogPartnerStatus();
+
+    // Update Scores
+    this.updateCatalogScoreDisplay();
+
+    // Render 20 game cards
+    if (window.renderGameCatalog) window.renderGameCatalog();
+
+    this.saveSession(0);
+  }
+
+  updateCatalogPartner(partnerName, partnerSlot) {
+    this.partnerName = partnerName;
+    const p1NameEl = document.getElementById('catalogP1Name');
+    const p2NameEl = document.getElementById('catalogP2Name');
+
+    if (this.slot === 1) {
+      if (p1NameEl) p1NameEl.innerText = `${this.username} (Kamu)`;
+      if (p2NameEl) p2NameEl.innerText = partnerName;
+    } else {
+      if (p1NameEl) p1NameEl.innerText = partnerName;
+      if (p2NameEl) p2NameEl.innerText = `${this.username} (Kamu)`;
+    }
+
+    this.updateCatalogPartnerStatus();
+  }
+
+  updateCatalogPartnerStatus() {
+    const isPartnerConnected = (this.conn && this.conn.open) || (this.game && this.game.peerPlayer && this.game.peerPlayer.connected);
+    const statusBadge = document.getElementById('catalogStatusBadge');
+    const inviteBanner = document.getElementById('catalogInviteBanner');
+
+    if (isPartnerConnected) {
+      if (statusBadge) {
+        statusBadge.className = 'badge badge-green';
+        statusBadge.innerText = '2/2 Partner Terhubung (Siap Main)';
+      }
+      if (inviteBanner) inviteBanner.classList.add('hidden');
+    } else {
+      if (statusBadge) {
+        statusBadge.className = 'badge badge-yellow';
+        statusBadge.innerText = '1/2 Menunggu Partner...';
+      }
+      if (inviteBanner) inviteBanner.classList.remove('hidden');
+    }
+  }
+
+  updateCatalogScoreDisplay() {
+    const p1ScoreEl = document.getElementById('catalogP1Score');
+    const p2ScoreEl = document.getElementById('catalogP2Score');
+    const statusEl = document.getElementById('aduSkorStatus');
+
+    if (p1ScoreEl) p1ScoreEl.innerText = this.scores.p1 || 0;
+    if (p2ScoreEl) p2ScoreEl.innerText = this.scores.p2 || 0;
+
+    if (statusEl) {
+      if (this.scores.p1 > this.scores.p2) {
+        statusEl.innerText = 'Bobi Unggul';
+        statusEl.style.color = '#00e5ff';
+      } else if (this.scores.p2 > this.scores.p1) {
+        statusEl.innerText = 'Bona Unggul';
+        statusEl.style.color = '#ff3b77';
+      } else {
+        statusEl.innerText = 'Skor Seri';
+        statusEl.style.color = '#cbd5e1';
+      }
+    }
+  }
+
+  addScore(slot, points) {
+    if (slot === 1) this.scores.p1 += points;
+    else if (slot === 2) this.scores.p2 += points;
+    this.saveScores();
+    this.updateCatalogScoreDisplay();
+    this.send({
+      type: 'score-update',
+      p1: this.scores.p1,
+      p2: this.scores.p2
+    });
+  }
+
+  launchGame(gameId, levelIndex) {
+    const levelStart = Date.now();
+    this.send({
+      type: 'launch-game',
+      gameId: gameId,
+      levelIndex: levelIndex,
+      levelStartTime: levelStart
+    });
+
+    this.startGame(gameId, levelIndex, levelStart);
+  }
+
+  startGame(gameId, levelIndex = 0, levelStart = Date.now()) {
+    this.inCatalog = false;
+
+    // Hide Catalog modal
+    const catalogModal = document.getElementById('catalogModal');
+    if (catalogModal) catalogModal.classList.add('hidden');
+
+    // Show in-game HUD
+    const hud = document.getElementById('gameHud');
+    if (hud) hud.classList.remove('hidden');
+
+    // Initialize or load level
+    if (!this.game) {
+      this.game = new window.GameEngine();
+      this.game.setSlot(this.slot);
+      this.game.myPlayer.name = this.username;
+      this.game.loadLevel(levelIndex, levelStart);
+      this.game.start();
+    } else {
+      this.game.setSlot(this.slot);
+      this.game.myPlayer.name = this.username;
+      this.game.loadLevel(levelIndex, levelStart);
+    }
+
+    if (this.partnerName && this.game.peerPlayer) {
+      this.game.peerPlayer.name = this.partnerName;
+      this.game.peerPlayer.connected = (this.conn && this.conn.open);
+    }
+
+    this.updateRoomBadgeCount((this.conn && this.conn.open) ? 2 : 1);
+    this.updateRoleBadge();
+    this.saveSession(levelIndex);
+
+    window.audioManager && window.audioManager.startBGM();
+    const gameObj = window.COOP_GAMES?.find(g => g.id === gameId);
+    this.showToast(`Memulai ${gameObj ? gameObj.title : 'Permainan'}!`);
+  }
+
+  returnToCatalog() {
+    this.send({ type: 'return-to-catalog' });
+    this.openGameCatalog(this.roomCode, this.slot, false);
+    this.showToast('Kembali ke Beranda Katalog Game');
+  }
+
+  broadcastLevelAdvance(nextLevelIdx) {
+    const levelStart = Date.now();
+    this.send({
+      type: 'level-complete',
+      levelIndex: nextLevelIdx,
+      levelStartTime: levelStart
+    });
+    if (this.game) {
+      this.game.loadLevel(nextLevelIdx, levelStart);
+    }
+    this.saveSession(nextLevelIdx);
+  }
+
+  recordGamePlayed() {
+    fetch('/api/game-played', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomCode: this.roomCode })
+    }).catch(() => {});
+  }
+
+  // ========================================================
   // LEAVE ROOM / RETURN TO LOBBY
   // ========================================================
   leaveRoom() {
@@ -1050,10 +1395,14 @@ class NetworkManager {
     this.roomCode = null;
     this.isHost = false;
     this.isPublic = false;
+    this.inCatalog = false;
 
-    // Hide HUD, show Lobby
+    // Hide HUD and Catalog, show Lobby
     const hud = document.getElementById('gameHud');
     if (hud) hud.classList.add('hidden');
+
+    const catalogModal = document.getElementById('catalogModal');
+    if (catalogModal) catalogModal.classList.add('hidden');
 
     const lobbyModal = document.getElementById('lobbyModal');
     if (lobbyModal) lobbyModal.classList.remove('hidden');

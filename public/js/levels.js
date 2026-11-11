@@ -272,9 +272,296 @@ const GAME_LEVELS = [
       { id: 'k5_3', x: 960, y: 90 }
     ],
     door: { x: 935, y: 70, width: 50, height: 80 }
+  },
+
+  // ========================================================
+  // LEVEL 6: Koridor Lava & Pegas Beruntun
+  // ========================================================
+  {
+    id: 6,
+    title: "Level 6: Koridor Lava & Pegas Beruntun",
+    hint: "Gunakan trampolin untuk melompati jurang lava yang membara dan raih kunci di angkasa!",
+    width: 1850,
+    height: 540,
+    spawns: {
+      p1: { x: 70, y: 430 },
+      p2: { x: 120, y: 430 }
+    },
+    platforms: [
+      { x: 0, y: 480, width: 280, height: 60, type: 'ground' },
+      { x: 380, y: 390, width: 140, height: 150, type: 'ground' },
+      { x: 620, y: 300, width: 150, height: 240, type: 'ground' },
+      { x: 880, y: 400, width: 140, height: 140, type: 'ground' },
+      { x: 1140, y: 320, width: 130, height: 220, type: 'ground' },
+      { x: 1400, y: 410, width: 140, height: 130, type: 'ground' },
+      { x: 1640, y: 480, width: 210, height: 60, type: 'ground' }
+    ],
+    movingPlatforms: [
+      { id: 'mp6_1', x: 295, y: 430, width: 65, height: 18, startX: 295, endX: 365, startY: 430, endY: 430, speed: 1.5 },
+      { id: 'mp6_2', x: 1285, y: 360, width: 65, height: 18, startX: 1285, endX: 1385, startY: 360, endY: 360, speed: 1.7 }
+    ],
+    springs: [
+      { id: 'sp6_1', x: 210, y: 466, width: 34, height: 14, bounceForce: -14 },
+      { id: 'sp6_2', x: 920, y: 386, width: 34, height: 14, bounceForce: -14.5 }
+    ],
+    spikes: [
+      { x: 280, y: 515, width: 1360, height: 25 }
+    ],
+    enemies: [
+      { id: 'en6_1', type: 'patroller', x: 410, y: 364, width: 30, height: 26, minX: 390, maxX: 500, speed: 1.5 },
+      { id: 'en6_2', type: 'flying', x: 760, y: 220, width: 32, height: 28, minX: 680, maxX: 840, baseY: 220, amplitude: 35, frequency: 2.2 },
+      { id: 'en6_3', type: 'patroller', x: 1160, y: 294, width: 30, height: 26, minX: 1150, maxX: 1250, speed: 1.6 }
+    ],
+    keys: [
+      { id: 'k6_1', x: 440, y: 330 },
+      { id: 'k6_2', x: 690, y: 240 },
+      { id: 'k6_3', x: 1460, y: 350 }
+    ],
+    buttons: [],
+    door: { x: 1720, y: 400, width: 50, height: 80 }
+  },
+
+  // ========================================================
+  // LEVEL 7: Benteng Saklar Ganda & Laser Bergantian
+  // ========================================================
+  {
+    id: 7,
+    title: "Level 7: Benteng Saklar Ganda & Laser Bergantian",
+    hint: "Pemain 1 menahan saklar A agar Pemain 2 lewat, lalu Pemain 2 menahan saklar B agar Pemain 1 lewat!",
+    width: 1900,
+    height: 540,
+    spawns: {
+      p1: { x: 70, y: 430 },
+      p2: { x: 120, y: 430 }
+    },
+    platforms: [
+      { x: 0, y: 480, width: 340, height: 60, type: 'ground' },
+      { x: 300, y: 320, width: 220, height: 25, type: 'ground' },
+      { x: 580, y: 140, width: 24, height: 400, type: 'ground' },
+      { x: 604, y: 480, width: 380, height: 60, type: 'ground' },
+      { x: 720, y: 280, width: 220, height: 25, type: 'ground' },
+      { x: 1040, y: 140, width: 24, height: 400, type: 'ground' },
+      { x: 1064, y: 480, width: 360, height: 60, type: 'ground' },
+      { x: 1180, y: 320, width: 200, height: 25, type: 'ground' },
+      { x: 1520, y: 480, width: 380, height: 60, type: 'ground' },
+
+      // Laser barriers
+      { id: 'barrier_b7_1', x: 580, y: 40, width: 24, height: 100, type: 'barrier' },
+      { id: 'barrier_b7_2', x: 1040, y: 40, width: 24, height: 100, type: 'barrier' }
+    ],
+    movingPlatforms: [
+      { id: 'mp7_1', x: 1430, y: 410, width: 70, height: 18, startX: 1430, endX: 1510, startY: 410, endY: 410, speed: 1.6 }
+    ],
+    springs: [
+      { id: 'sp7_1', x: 240, y: 466, width: 34, height: 14, bounceForce: -13.5 },
+      { id: 'sp7_2', x: 920, y: 466, width: 34, height: 14, bounceForce: -13.5 }
+    ],
+    spikes: [
+      { x: 340, y: 515, width: 240, height: 25 },
+      { x: 984, y: 515, width: 80, height: 25 },
+      { x: 1424, y: 515, width: 96, height: 25 }
+    ],
+    buttons: [
+      { id: 'btn7_1', x: 420, y: 305, width: 45, height: 15, linkedBarrierId: 'barrier_b7_1' },
+      { id: 'btn7_2', x: 800, y: 265, width: 45, height: 15, linkedBarrierId: 'barrier_b7_2' }
+    ],
+    enemies: [
+      { id: 'en7_1', type: 'patroller', x: 680, y: 454, width: 30, height: 26, minX: 630, maxX: 950, speed: 1.6 },
+      { id: 'en7_2', type: 'flying', x: 1250, y: 200, width: 32, height: 28, minX: 1100, maxX: 1350, baseY: 200, amplitude: 35, frequency: 2.2 }
+    ],
+    keys: [
+      { id: 'k7_1', x: 460, y: 260 },
+      { id: 'k7_2', x: 860, y: 220 },
+      { id: 'k7_3', x: 1260, y: 260 }
+    ],
+    door: { x: 1740, y: 400, width: 50, height: 80 }
+  },
+
+  // ========================================================
+  // LEVEL 8: Tebing Kristal Es & Jalur Estafet Balok
+  // ========================================================
+  {
+    id: 8,
+    title: "Level 8: Tebing Kristal Es & Jalur Estafet Balok",
+    hint: "Jurang es sangat lebar! Buat balok secara estafet bergantian untuk menjembatani jurang!",
+    width: 1950,
+    height: 540,
+    spawns: {
+      p1: { x: 70, y: 430 },
+      p2: { x: 120, y: 430 }
+    },
+    platforms: [
+      { x: 0, y: 480, width: 280, height: 60, type: 'ground' },
+      { x: 380, y: 420, width: 110, height: 120, type: 'ground' },
+      { x: 590, y: 340, width: 120, height: 200, type: 'ground' },
+      { x: 810, y: 260, width: 130, height: 280, type: 'ground' },
+      { x: 1050, y: 360, width: 120, height: 180, type: 'ground' },
+      { x: 1270, y: 440, width: 120, height: 100, type: 'ground' },
+      { x: 1500, y: 350, width: 130, height: 190, type: 'ground' },
+      { x: 1730, y: 480, width: 220, height: 60, type: 'ground' }
+    ],
+    movingPlatforms: [
+      { id: 'mp8_1', x: 955, y: 300, width: 65, height: 18, startX: 955, endX: 1035, startY: 300, endY: 300, speed: 1.5 },
+      { id: 'mp8_2', x: 1640, y: 400, width: 65, height: 18, startX: 1640, endX: 1710, startY: 400, endY: 400, speed: 1.8 }
+    ],
+    springs: [
+      { id: 'sp8_1', x: 210, y: 466, width: 34, height: 14, bounceForce: -13.5 },
+      { id: 'sp8_2', x: 1310, y: 426, width: 34, height: 14, bounceForce: -14 }
+    ],
+    spikes: [
+      { x: 280, y: 515, width: 1450, height: 25 }
+    ],
+    enemies: [
+      { id: 'en8_1', type: 'patroller', x: 620, y: 314, width: 30, height: 26, minX: 600, maxX: 690, speed: 1.4 },
+      { id: 'en8_2', type: 'flying', x: 920, y: 160, width: 32, height: 28, minX: 840, maxX: 1000, baseY: 160, amplitude: 40, frequency: 2.6 },
+      { id: 'en8_3', type: 'patroller', x: 1530, y: 324, width: 30, height: 26, minX: 1510, maxX: 1610, speed: 1.5 }
+    ],
+    keys: [
+      { id: 'k8_1', x: 420, y: 360 },
+      { id: 'k8_2', x: 870, y: 200 },
+      { id: 'k8_3', x: 1550, y: 290 }
+    ],
+    buttons: [],
+    door: { x: 1810, y: 400, width: 50, height: 80 }
+  },
+
+  // ========================================================
+  // LEVEL 9: Menara Melayang & Serangan Tiga Drone
+  // ========================================================
+  {
+    id: 9,
+    title: "Level 9: Menara Melayang & Serangan Tiga Drone",
+    hint: "Tiga drone berpatroli di udara! Berjongkok atau pasang balok perisai untuk berlindung!",
+    width: 2000,
+    height: 540,
+    spawns: {
+      p1: { x: 70, y: 430 },
+      p2: { x: 120, y: 430 }
+    },
+    platforms: [
+      { x: 0, y: 480, width: 300, height: 60, type: 'ground' },
+      { x: 400, y: 400, width: 130, height: 140, type: 'ground' },
+      { x: 630, y: 310, width: 140, height: 230, type: 'ground' },
+      { x: 870, y: 220, width: 150, height: 320, type: 'ground' },
+      { x: 1120, y: 310, width: 140, height: 230, type: 'ground' },
+      { x: 1360, y: 400, width: 130, height: 140, type: 'ground' },
+      { x: 1590, y: 300, width: 140, height: 240, type: 'ground' },
+      { x: 1820, y: 480, width: 180, height: 60, type: 'ground' }
+    ],
+    movingPlatforms: [
+      { id: 'mp9_1', x: 315, y: 440, width: 70, height: 18, startX: 315, endX: 385, startY: 440, endY: 440, speed: 1.8 },
+      { id: 'mp9_2', x: 1495, y: 350, width: 75, height: 18, startX: 1495, endX: 1575, startY: 350, endY: 350, speed: 1.8 }
+    ],
+    springs: [
+      { id: 'sp9_1', x: 220, y: 466, width: 34, height: 14, bounceForce: -14 },
+      { id: 'sp9_2', x: 1400, y: 386, width: 34, height: 14, bounceForce: -14 }
+    ],
+    spikes: [
+      { x: 300, y: 515, width: 1520, height: 25 }
+    ],
+    enemies: [
+      { id: 'en9_1', type: 'flying', x: 500, y: 200, width: 32, height: 28, minX: 420, maxX: 600, baseY: 200, amplitude: 45, frequency: 2.8 },
+      { id: 'en9_2', type: 'flying', x: 950, y: 130, width: 32, height: 28, minX: 880, maxX: 1040, baseY: 130, amplitude: 35, frequency: 3.0 },
+      { id: 'en9_3', type: 'flying', x: 1450, y: 220, width: 32, height: 28, minX: 1350, maxX: 1550, baseY: 220, amplitude: 40, frequency: 2.6 }
+    ],
+    keys: [
+      { id: 'k9_1', x: 450, y: 340 },
+      { id: 'k9_2', x: 930, y: 160 },
+      { id: 'k9_3', x: 1640, y: 240 }
+    ],
+    buttons: [],
+    door: { x: 1890, y: 400, width: 50, height: 80 }
+  },
+
+  // ========================================================
+  // LEVEL 10: Ujian Puncak Pasangan Sejati (Grand Co-op Finale)
+  // ========================================================
+  {
+    id: 10,
+    title: "Level 10: Ujian Puncak Pasangan Sejati",
+    hint: "Ujian terakhir! Bekerjasama mengaktifkan saklar, hindari rintangan gabungan dan masuki Gerbang Cinta Abadi!",
+    width: 2100,
+    height: 540,
+    spawns: {
+      p1: { x: 80, y: 430 },
+      p2: { x: 130, y: 430 }
+    },
+    platforms: [
+      { x: 0, y: 480, width: 320, height: 60, type: 'ground' },
+      { x: 380, y: 360, width: 180, height: 25, type: 'ground' },
+      { x: 620, y: 140, width: 24, height: 400, type: 'ground' },
+      { x: 644, y: 480, width: 340, height: 60, type: 'ground' },
+      { x: 740, y: 280, width: 180, height: 25, type: 'ground' },
+      { x: 1060, y: 380, width: 140, height: 160, type: 'ground' },
+      { x: 1280, y: 290, width: 140, height: 250, type: 'ground' },
+      { x: 1500, y: 200, width: 140, height: 340, type: 'ground' },
+      { x: 1760, y: 120, width: 180, height: 40, type: 'ground' },
+      { x: 1760, y: 480, width: 340, height: 60, type: 'ground' },
+
+      // Laser barrier linked to switch
+      { id: 'barrier_b10_1', x: 620, y: 40, width: 24, height: 100, type: 'barrier' }
+    ],
+    movingPlatforms: [
+      { id: 'mp10_1', x: 990, y: 430, width: 60, height: 18, startX: 990, endX: 1050, startY: 430, endY: 430, speed: 1.6 },
+      { id: 'mp10_2', x: 1650, y: 170, width: 60, height: 18, startX: 1650, endX: 1740, startY: 170, endY: 170, speed: 1.8 }
+    ],
+    springs: [
+      { id: 'sp10_1', x: 240, y: 466, width: 34, height: 14, bounceForce: -14 },
+      { id: 'sp10_2', x: 1110, y: 366, width: 34, height: 14, bounceForce: -14.5 }
+    ],
+    spikes: [
+      { x: 320, y: 515, width: 300, height: 25 },
+      { x: 984, y: 515, width: 776, height: 25 }
+    ],
+    buttons: [
+      { id: 'btn10_1', x: 440, y: 345, width: 45, height: 15, linkedBarrierId: 'barrier_b10_1' }
+    ],
+    enemies: [
+      { id: 'en10_1', type: 'patroller', x: 720, y: 454, width: 30, height: 26, minX: 660, maxX: 950, speed: 1.8 },
+      { id: 'en10_2', type: 'flying', x: 1150, y: 220, width: 32, height: 28, minX: 1060, maxX: 1240, baseY: 220, amplitude: 40, frequency: 2.8 },
+      { id: 'en10_3', type: 'flying', x: 1570, y: 110, width: 32, height: 28, minX: 1510, maxX: 1630, baseY: 110, amplitude: 30, frequency: 3.2 }
+    ],
+    keys: [
+      { id: 'k10_1', x: 480, y: 300 },
+      { id: 'k10_2', x: 800, y: 220 },
+      { id: 'k10_3', x: 1330, y: 230 },
+      { id: 'k10_4', x: 1830, y: 60 }
+    ],
+    door: { x: 1870, y: 40, width: 50, height: 80 }
   }
 ];
 
+// ========================================================
+// 20 CO-OP GAMES CATALOG (KATALOG DAFTAR GAME CO-OP 2 PEMAIN)
+// ========================================================
+const COOP_GAMES = [
+  { id: 1, title: 'Duo Quest: Gerbang Awal', tag: 'Petualangan Co-op', desc: 'Bekerjasama membuat balok dan menginjak monster lendir untuk membuka pintu portal.', targetLevel: 1, maxLevel: 10 },
+  { id: 2, title: 'Tebing Pegas & Drone Udara', tag: 'Ketangkasan Pegas', desc: 'Lompat menggunakan trampolin pegas dan hindari patroli drone pengawas tebing.', targetLevel: 2, maxLevel: 10 },
+  { id: 3, title: 'Labirin Saklar & Sinar Laser', tag: 'Teka-Teki Saklar', desc: 'Satu pemain menahan saklar agar laser padam sehingga pasangan bisa melintas.', targetLevel: 3, maxLevel: 10 },
+  { id: 4, title: 'Jurang Nebula & Kawanan Drone', tag: 'Platformer Presisi', desc: 'Susun balok jembatan di atas jurang luas tanpa terjatuh ke ladang duri.', targetLevel: 4, maxLevel: 10 },
+  { id: 5, title: 'Menara Puncak Cinta Duo', tag: 'Ujian Kerjasama', desc: 'Naiki platform bergerak ke menara tertinggi dan kumpulkan kunci emas bersama.', targetLevel: 5, maxLevel: 10 },
+  { id: 6, title: 'Lava Rush: Lantai Membara', tag: 'Survival Cepat', desc: 'Jauhi lantai bawah tanah yang membara, bangun pijakan balok secepat mungkin.', targetLevel: 6, maxLevel: 10 },
+  { id: 7, title: 'Benteng Saklar Ganda', tag: 'Sinkronisasi Saklar', desc: 'Dua gerbang laser harus dibuka bergantian oleh Bobi dan Bona secara estafet.', targetLevel: 7, maxLevel: 10 },
+  { id: 8, title: 'Tebing Kristal Es', tag: 'Presisi & Estafet', desc: 'Tebing es licin dan jurang luas, buat balok bertingkat agar partner bisa memanjat.', targetLevel: 8, maxLevel: 10 },
+  { id: 9, title: 'Menara Tiga Drone Pengawas', tag: 'Hindaran Udara', desc: 'Hindari tiga drone berkecepatan tinggi dengan bersembunyi di bawah platform balok.', targetLevel: 9, maxLevel: 10 },
+  { id: 10, title: 'Ujian Puncak Pasangan Sejati', tag: 'Tantangan Pamungkas', desc: 'Ujian terakhir: gabungan semua rintangan, laser, pegas, dan jurang berduri dalam 1 level!', targetLevel: 10, maxLevel: 10 },
+  { id: 11, title: 'Jembatan Runtuh & Balok Cepat', tag: 'Kecepatan Balok', desc: 'Platform mudah runtuh, pemain harus saling menaruh balok darurat untuk partner.', targetLevel: 1, maxLevel: 10 },
+  { id: 12, title: 'Labirin Saklar Berantai', tag: 'Sinkronisasi Teka-Teki', desc: 'Dua saklar harus ditekan bergantian dari dua sisi tebing berbeda untuk menembus lorong.', targetLevel: 3, maxLevel: 10 },
+  { id: 13, title: 'Arena Lendir Monster Kembar', tag: 'Aksi Timpukan', desc: 'Musuh lendir berpatroli ketat, gunakan balok dari atas untuk mengurung mereka.', targetLevel: 1, maxLevel: 10 },
+  { id: 14, title: 'Tebing Angin & Drone Gesit', tag: 'Manuver Udara', desc: 'Waspadai ritme drone yang menukik cepat saat melompat antar platform.', targetLevel: 4, maxLevel: 10 },
+  { id: 15, title: 'Koridor Duri Bergerak', tag: 'Ketangkasan Lompat', desc: 'Platform bergerak melintasi ladang duri, lompat di saat yang tepat!', targetLevel: 2, maxLevel: 10 },
+  { id: 16, title: 'Teka-Teki Pintu Kembar', tag: 'Koleksi Kunci', desc: 'Kunci terpisah di ujung peta memerlukan kedua pemain bergerak ke dua arah berlawanan.', targetLevel: 4, maxLevel: 10 },
+  { id: 17, title: 'Menara Lift Bergantian', tag: 'Elevator Co-op', desc: 'Naiki moving platform bertingkat yang bergerak dengan ritme berbeda menuju puncak.', targetLevel: 5, maxLevel: 10 },
+  { id: 18, title: 'Gua Kristal & Platform Goyang', tag: 'Keseimbangan Balok', desc: 'Platform sempit membutuhkan kerjasama estafet balok agar tidak terjatuh.', targetLevel: 6, maxLevel: 10 },
+  { id: 19, title: 'Pertempuran Saklar Waktu', tag: 'Uji Kecepatan', desc: 'Gerbang laser terbuka hanya sebentar setelah saklar dilepas, lari cepat!', targetLevel: 7, maxLevel: 10 },
+  { id: 20, title: 'Puncak Kejayaan Pasangan Abadi', tag: 'Level Kehormatan', desc: 'Ujian penutup menuju portal kemenangan abadi dengan skor bonus tertinggi.', targetLevel: 10, maxLevel: 10 }
+];
+
+if (typeof window !== 'undefined') {
+  window.GAME_LEVELS = GAME_LEVELS;
+  window.COOP_GAMES = COOP_GAMES;
+}
+
 if (typeof module !== 'undefined') {
-  module.exports = { GAME_LEVELS };
+  module.exports = { GAME_LEVELS, COOP_GAMES };
 }

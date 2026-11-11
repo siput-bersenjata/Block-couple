@@ -753,6 +753,7 @@ class GameEngine {
 
     if (window.networkManager) {
       window.networkManager.emitDefeatEnemy(enemyId);
+      window.networkManager.addScore(this.localSlot, 150);
     }
   }
 
@@ -898,6 +899,7 @@ class GameEngine {
 
         if (window.networkManager) {
           window.networkManager.emitCollectKey(key.id);
+          window.networkManager.addScore(this.localSlot, 100);
         }
 
         if (this.collectedKeys.length === this.currentLevel.keys.length) {
@@ -923,8 +925,29 @@ class GameEngine {
     const peerAtDoor = this.peerPlayer.connected && allKeysCollected && this.checkOverlap(this.peerPlayer, door);
     this.peerPlayer.atDoor = peerAtDoor;
 
-    if (myAtDoor && peerAtDoor) {
+    if (myAtDoor && (peerAtDoor || !this.peerPlayer.connected)) {
       this.createVictoryConfetti();
+      if (!this.levelCompleted) {
+        this.levelCompleted = true;
+        window.audioManager && window.audioManager.playLevelComplete();
+        this.addFloatingText(this.myPlayer.x, this.myPlayer.y - 45, "LEVEL SELESAI!", '#00ffcc', 24);
+
+        if (window.networkManager) {
+          window.networkManager.addScore(1, 300);
+          window.networkManager.addScore(2, 300);
+          window.networkManager.recordGamePlayed();
+        }
+
+        setTimeout(() => {
+          this.levelCompleted = false;
+          const nextLevelIdx = (this.currentLevelIndex + 1) % GAME_LEVELS.length;
+          if (window.networkManager) {
+            window.networkManager.broadcastLevelAdvance(nextLevelIdx);
+          } else {
+            this.loadLevel(nextLevelIdx);
+          }
+        }, 2200);
+      }
     }
   }
 
