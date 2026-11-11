@@ -1100,6 +1100,12 @@
       ctx.restore();
     };
 
+    GameEngine.prototype.renderPlayer = function(player, type) {
+      if (typeof this.renderCharacter === 'function') {
+        this.renderCharacter(this.ctx, player);
+      }
+    };
+
     GameEngine.prototype.renderFloatingTexts = function(ctx) {
       if (typeof this.renderOverlays === 'function') {
         this.renderOverlays(ctx);
