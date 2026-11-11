@@ -288,6 +288,28 @@ class AudioManager {
     } catch(e) {}
   }
 
+  playWaka() {
+    if (this.muted) return;
+    this.init();
+    try {
+      this.wakaAlt = !this.wakaAlt;
+      const freq = this.wakaAlt ? 330 : 480;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.75, this.ctx.currentTime + 0.06);
+
+      gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.005, this.ctx.currentTime + 0.06);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.07);
+    } catch(e) {}
+  }
+
   // Safe Aliases for backward/mode compatibility
   jump() { try { this.playJump(); } catch(e) {} }
   bump() { try { this.playSpringBounce(); } catch(e) {} }
@@ -297,6 +319,7 @@ class AudioManager {
   laser() { try { this.playLaser(); } catch(e) {} }
   shoot() { try { this.playLaser(); } catch(e) {} }
   explosion() { try { this.playExplosion(); } catch(e) {} }
+  waka() { try { this.playWaka(); } catch(e) {} }
 
   startBGM() {
     if (this.bgmPlaying || this.muted) return;

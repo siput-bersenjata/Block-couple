@@ -757,17 +757,26 @@
 
       this.myPlayer.x = 240;
       this.myPlayer.y = 270;
+      this.myPlayer.pacAngle = 0;
+      this.myPlayer.isMoving = false;
+      this.myPlayer.chompTimer = 0;
+
       this.peerPlayer.x = 720;
       this.peerPlayer.y = 270;
+      this.peerPlayer.pacAngle = Math.PI;
+      this.peerPlayer.isMoving = false;
+      this.peerPlayer.chompTimer = 0;
 
       this.pacman = {
         score: 0,
         dots: [],
         powerPellets: [],
+        invulnerableTimer: 0,
+        cleared: false,
         ghosts: [
-          { x: 440, y: 220, color: '#ef4444', name: 'Blinky', vx: 80, vy: 0 },
-          { x: 520, y: 220, color: '#ec4899', name: 'Pinky', vx: -80, vy: 0 },
-          { x: 480, y: 260, color: '#00e5ff', name: 'Inky', vx: 0, vy: 80 }
+          { x: 440, y: 220, color: '#ef4444', name: 'Blinky', vx: 90, vy: 0, changeTimer: 1.5 },
+          { x: 520, y: 220, color: '#ec4899', name: 'Pinky', vx: -90, vy: 0, changeTimer: 1.8 },
+          { x: 480, y: 260, color: '#00e5ff', name: 'Inky', vx: 0, vy: 90, changeTimer: 2.2 }
         ],
         frightenedTimer: 0
       };
@@ -796,6 +805,8 @@
       const p = this.pacman;
       if (!p) return;
 
+      if (p.invulnerableTimer > 0) p.invulnerableTimer -= dt;
+
       // Pacman 4-way movement
       let vx = 0;
       let vy = 0;
@@ -804,23 +815,81 @@
       if (this.keysDown['arrowup'] || this.keysDown['w'] || this.touchState.up) vy -= 1;
       if (this.keysDown['arrowdown'] || this.keysDown['s'] || this.touchState.down) vy += 1;
 
-      const speed = 210;
-      if (vx !== 0 || vy !== 0) {
+      // Turbo speed
+      const isTurbo = this.keysDown[' '] || this.keysDown['shift'] || this.touchState.jump;
+      const speed = isTurbo ? 280 : 210;
+
+      const isMoving = (vx !== 0 || vy !== 0);
+      this.myPlayer.isMoving = isMoving;
+
+      if (isMoving) {
         this.myPlayer.x += vx * speed * dt;
         this.myPlayer.y += vy * speed * dt;
+
+        // Exact 4-way orientation angle (0: right, Math.PI/2: down, Math.PI: left, -Math.PI/2: up)
+        this.myPlayer.pacAngle = Math.atan2(vy, vx);
         this.myPlayer.facing = vx < 0 ? -1 : 1;
-        this.myPlayer.x = Math.max(60, Math.min(900, this.myPlayer.x));
-        this.myPlayer.y = Math.max(60, Math.min(480, this.myPlayer.y));
+        this.myPlayer.chompTimer = (this.myPlayer.chompTimer || 0) + dt * (isTurbo ? 22 : 16);
+
+        // Clamping to arena boundaries
+        this.myPlayer.x = Math.max(68, Math.min(892, this.myPlayer.x));
+        this.myPlayer.y = Math.max(58, Math.min(482, this.myPlayer.y));
+      }
+
+      // Broadcast position and angle to peer via network
+      if (window.networkManager && typeof window.networkManager.emitPlayerUpdate === 'function') {
+        window.networkManager.emitPlayerUpdate({
+          x: this.myPlayer.x,
+          y: this.myPlayer.y,
+          vx: vx * speed,
+          vy: vy * speed,
+          facing: this.myPlayer.facing,
+          pacAngle: this.myPlayer.pacAngle,
+          isMoving: isMoving,
+          chompTimer: this.myPlayer.chompTimer
+        });
+      }
+
+      // Peer Player chomp update
+      if (this.peerPlayer.connected) {
+        if (this.peerPlayer.isMoving || Math.hypot(this.peerPlayer.vx, this.peerPlayer.vy) > 10) {
+          this.peerPlayer.chompTimer = (this.peerPlayer.chompTimer || 0) + dt * 16;
+          this.peerPlayer.isMoving = true;
+          if (this.peerPlayer.pacAngle === undefined && (this.peerPlayer.vx !== 0 || this.peerPlayer.vy !== 0)) {
+            this.peerPlayer.pacAngle = Math.atan2(this.peerPlayer.vy, this.peerPlayer.vx);
+          }
+        } else {
+          this.peerPlayer.isMoving = false;
+        }
       }
 
       // Eat Dots
       for (let i = p.dots.length - 1; i >= 0; i--) {
         const dot = p.dots[i];
-        if (Math.hypot(this.myPlayer.x - dot.x, this.myPlayer.y - dot.y) < 18) {
+        if (Math.hypot(this.myPlayer.x - dot.x, this.myPlayer.y - dot.y) < 20) {
           p.dots.splice(i, 1);
           p.score += 10;
+          this.createCoinParticles(dot.x, dot.y, '#fde047');
+          if (window.audioManager && typeof window.audioManager.playWaka === 'function') {
+            try { window.audioManager.playWaka(); } catch(e) {}
+          }
           break;
         }
+      }
+
+      // Check all dots cleared
+      if (p.dots.length === 0 && !p.cleared) {
+        p.cleared = true;
+        p.score += 1000;
+        this.addFloatingText(480, 240, 'LABIRIN BERSIH! +1000 PTS', '#ffd700', 32);
+        if (window.audioManager && typeof window.audioManager.playLevelComplete === 'function') {
+          try { window.audioManager.playLevelComplete(); } catch(e) {}
+        }
+        setTimeout(() => {
+          if (this.gameMode === 'pacman') {
+            this.initPacmanMode((this.currentLevelIndex || 0) + 1);
+          }
+        }, 3000);
       }
 
       // Eat Power Pellet
@@ -842,22 +911,75 @@
 
       // Ghost roaming & collision
       for (const g of p.ghosts) {
+        // Ghost AI roam
+        g.changeTimer = (g.changeTimer || 0) - dt;
+        if (g.changeTimer <= 0) {
+          g.changeTimer = 1.5 + Math.random() * 2;
+          const dirs = [
+            { vx: 90, vy: 0 },
+            { vx: -90, vy: 0 },
+            { vx: 0, vy: 90 },
+            { vx: 0, vy: -90 }
+          ];
+          // If frightened, wander slower away from player
+          if (p.frightenedTimer > 0) {
+            const awayDir = Math.atan2(g.y - this.myPlayer.y, g.x - this.myPlayer.x);
+            g.vx = Math.cos(awayDir) * 60;
+            g.vy = Math.sin(awayDir) * 60;
+          } else {
+            // Chance to track player
+            if (Math.random() < 0.45) {
+              const toPlayer = Math.atan2(this.myPlayer.y - g.y, this.myPlayer.x - g.x);
+              // Pick closest cardinal direction
+              if (Math.abs(Math.cos(toPlayer)) > Math.abs(Math.sin(toPlayer))) {
+                g.vx = Math.cos(toPlayer) > 0 ? 95 : -95;
+                g.vy = 0;
+              } else {
+                g.vx = 0;
+                g.vy = Math.sin(toPlayer) > 0 ? 95 : -95;
+              }
+            } else {
+              const pick = dirs[Math.floor(Math.random() * dirs.length)];
+              g.vx = pick.vx;
+              g.vy = pick.vy;
+            }
+          }
+        }
+
         g.x += g.vx * dt;
         g.y += g.vy * dt;
-        if (g.x < 100 || g.x > 860) g.vx = -g.vx;
-        if (g.y < 80 || g.y > 460) g.vy = -g.vy;
+
+        // Arena boundary bouncing
+        if (g.x < 70) { g.x = 70; g.vx = Math.abs(g.vx); }
+        if (g.x > 890) { g.x = 890; g.vx = -Math.abs(g.vx); }
+        if (g.y < 60) { g.y = 60; g.vy = Math.abs(g.vy); }
+        if (g.y > 480) { g.y = 480; g.vy = -Math.abs(g.vy); }
 
         // Player touches ghost
-        if (Math.hypot(this.myPlayer.x - g.x, this.myPlayer.y - g.y) < 22) {
+        if (Math.hypot(this.myPlayer.x - g.x, this.myPlayer.y - g.y) < 24) {
           if (p.frightenedTimer > 0) {
             // Eat ghost!
             g.x = 480;
-            g.y = 240;
+            g.y = 260;
+            g.changeTimer = 2.0;
             p.score += 200;
-            this.addFloatingText(this.myPlayer.x, this.myPlayer.y - 10, '+200 HANTU TERMAKAN!', '#00e5ff', 22);
+            this.createExplosion(g.x, g.y, '#00e5ff', 16);
+            this.addFloatingText(this.myPlayer.x, this.myPlayer.y - 12, '+200 HANTU TERMAKAN!', '#00e5ff', 22);
             if (window.audioManager && typeof window.audioManager.playEnemyDefeat === 'function') {
               try { window.audioManager.playEnemyDefeat(); } catch(e) {}
             }
+          } else if ((p.invulnerableTimer || 0) <= 0) {
+            // Caught by ghost!
+            p.invulnerableTimer = 2.0;
+            this.createExplosion(this.myPlayer.x, this.myPlayer.y, '#ef4444', 16);
+            this.addFloatingText(this.myPlayer.x, this.myPlayer.y - 15, 'TERTANGKAP HANTU!', '#ef4444', 22);
+            if (window.audioManager && typeof window.audioManager.playHurt === 'function') {
+              try { window.audioManager.playHurt(); } catch(e) {}
+            }
+            // Respawn to starting side
+            this.myPlayer.x = this.localSlot === 1 ? 240 : 720;
+            this.myPlayer.y = 270;
+            this.myPlayer.pacAngle = this.localSlot === 1 ? 0 : Math.PI;
           }
         }
       }
@@ -874,11 +996,40 @@
       ctx.fillStyle = '#060a16';
       ctx.fillRect(0, 0, 960, 540);
 
-      // Maze Wall Borders (Cyberpunk double-line)
+      // Maze Wall Outer Borders (Cyberpunk double-line)
       ctx.strokeStyle = '#1d4ed8';
       ctx.lineWidth = 4;
       ctx.strokeRect(50, 40, 860, 460);
-      ctx.strokeRect(360, 180, 240, 160);
+
+      // Ghost House with Open Top Gate
+      ctx.strokeStyle = '#1e40af';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      // Left side of roof
+      ctx.moveTo(360, 180);
+      ctx.lineTo(440, 180);
+      // Gap for gate between 440 and 520
+      ctx.moveTo(520, 180);
+      ctx.lineTo(600, 180);
+      // Right wall
+      ctx.lineTo(600, 340);
+      // Floor
+      ctx.lineTo(360, 340);
+      // Left wall
+      ctx.lineTo(360, 180);
+      ctx.stroke();
+
+      // Glowing Translucent Gate Barrier
+      ctx.save();
+      ctx.strokeStyle = '#ec4899';
+      ctx.shadowColor = '#ec4899';
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(442, 180);
+      ctx.lineTo(518, 180);
+      ctx.stroke();
+      ctx.restore();
 
       // Dots
       ctx.fillStyle = '#fde047';
@@ -903,13 +1054,36 @@
       // Ghosts
       for (const g of p.ghosts) {
         const isFrightened = p.frightenedTimer > 0;
-        this.drawGhostSprite(ctx, g.x, g.y, isFrightened ? '#38bdf8' : g.color, isFrightened);
+        // Flash warning when frightened timer is about to run out (< 2.5s)
+        const isFlashing = isFrightened && p.frightenedTimer < 2.5 && Math.floor(Date.now() / 150) % 2 === 0;
+        const ghostColor = isFrightened ? (isFlashing ? '#ffffff' : '#38bdf8') : g.color;
+        this.drawGhostSprite(ctx, g.x, g.y, ghostColor, isFrightened, g.vx, g.vy);
       }
 
-      // Draw Pac-Mascots (Bobi & Bona with animated mouth chomp)
-      this.drawPacMascot(ctx, this.myPlayer.x, this.myPlayer.y, this.localSlot === 1 ? 'bobi' : 'bona', this.myPlayer.facing);
+      // Draw Pac-Mascots (Bobi & Bona with animated 4-directional mouth chomp)
+      const myAngle = this.myPlayer.pacAngle || 0;
+      this.drawPacMascot(
+        ctx,
+        this.myPlayer.x,
+        this.myPlayer.y,
+        this.localSlot === 1 ? 'bobi' : 'bona',
+        myAngle,
+        this.myPlayer.isMoving,
+        this.myPlayer.chompTimer,
+        (p.invulnerableTimer || 0) > 0
+      );
       if (this.peerPlayer.connected) {
-        this.drawPacMascot(ctx, this.peerPlayer.x, this.peerPlayer.y, this.localSlot === 1 ? 'bona' : 'bobi', this.peerPlayer.facing);
+        const peerAngle = this.peerPlayer.pacAngle !== undefined ? this.peerPlayer.pacAngle : (this.peerPlayer.facing === -1 ? Math.PI : 0);
+        this.drawPacMascot(
+          ctx,
+          this.peerPlayer.x,
+          this.peerPlayer.y,
+          this.localSlot === 1 ? 'bona' : 'bobi',
+          peerAngle,
+          this.peerPlayer.isMoving,
+          this.peerPlayer.chompTimer,
+          false
+        );
       }
 
       this.renderParticles(ctx);
@@ -925,63 +1099,172 @@
       ctx.restore();
     };
 
-    GameEngine.prototype.drawGhostSprite = function(ctx, x, y, color, isFrightened) {
+    GameEngine.prototype.drawGhostSprite = function(ctx, x, y, color, isFrightened, vx = 0, vy = 0) {
       ctx.save();
       ctx.translate(x, y);
 
+      // Cute floating bobbing motion
+      const floatY = Math.sin(Date.now() / 180 + x * 0.05) * 2;
+      ctx.translate(0, floatY);
+
       ctx.fillStyle = color;
       ctx.shadowColor = color;
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 10;
+
+      // Tentacles wave cycle
+      const skirtWave = Math.sin(Date.now() / 100 + x * 0.1) * 2;
 
       // Ghost Head & Body
       ctx.beginPath();
-      ctx.arc(0, -4, 12, Math.PI, 0);
-      ctx.lineTo(12, 12);
-      ctx.lineTo(6, 8);
-      ctx.lineTo(0, 12);
-      ctx.lineTo(-6, 8);
-      ctx.lineTo(-12, 12);
+      ctx.arc(0, -4, 13, Math.PI, 0);
+      ctx.lineTo(13, 11);
+      ctx.lineTo(7, 8 + skirtWave);
+      ctx.lineTo(0, 11 - skirtWave);
+      ctx.lineTo(-7, 8 + skirtWave);
+      ctx.lineTo(-13, 11);
       ctx.closePath();
       ctx.fill();
 
-      // Eyes
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(-4, -4, 3.5, 0, Math.PI * 2);
-      ctx.arc(4, -4, 3.5, 0, Math.PI * 2);
-      ctx.fill();
+      // Ghost Eyes - pupils look towards ghost movement direction!
+      const eyeDirX = vx > 10 ? 1.5 : (vx < -10 ? -1.5 : 0);
+      const eyeDirY = vy > 10 ? 1.5 : (vy < -10 ? -1.5 : 0);
 
-      ctx.fillStyle = isFrightened ? '#ef4444' : '#0f172a';
-      ctx.beginPath();
-      ctx.arc(-4, -4, 1.8, 0, Math.PI * 2);
-      ctx.arc(4, -4, 1.8, 0, Math.PI * 2);
-      ctx.fill();
+      if (isFrightened) {
+        // Scared wavy face
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(-4, -4, 2.5, 0, Math.PI * 2);
+        ctx.arc(4, -4, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-5, 4);
+        ctx.lineTo(-2, 2);
+        ctx.lineTo(1, 4);
+        ctx.lineTo(4, 2);
+        ctx.stroke();
+      } else {
+        // Normal expressive eyes
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(-4.5, -4, 3.8, 0, Math.PI * 2);
+        ctx.arc(4.5, -4, 3.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(-4.5 + eyeDirX, -4 + eyeDirY, 2.0, 0, Math.PI * 2);
+        ctx.arc(4.5 + eyeDirX, -4 + eyeDirY, 2.0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Twinkle catchlight
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(-4.0 + eyeDirX, -4.5 + eyeDirY, 0.8, 0, Math.PI * 2);
+        ctx.arc(5.0 + eyeDirX, -4.5 + eyeDirY, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       ctx.restore();
     };
 
-    GameEngine.prototype.drawPacMascot = function(ctx, x, y, type, facing) {
+    GameEngine.prototype.drawPacMascot = function(ctx, x, y, type, angle = 0, isMoving = false, chompTimer = 0, isInvulnerable = false) {
+      if (isInvulnerable && Math.floor(Date.now() / 100) % 2 === 0) return; // Flash effect when invulnerable
+
       ctx.save();
       ctx.translate(x, y);
-      if (facing === -1) ctx.scale(-1, 1);
+
+      // Normalize angle to [-PI, PI]
+      let normAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      if (normAngle > Math.PI) normAngle -= Math.PI * 2;
+
+      // Handle orientation: mouth points in movement direction while keeping eyes upright
+      if (Math.abs(normAngle) > Math.PI / 2) {
+        // Facing Leftward (quadrant 2 or 3)
+        ctx.scale(-1, 1);
+        ctx.rotate(Math.PI - normAngle);
+      } else {
+        // Facing Rightward, Upward, or Downward (quadrant 1 or 4)
+        ctx.rotate(normAngle);
+      }
 
       const color = type === 'bobi' ? '#00e5ff' : '#ff3b77';
-      ctx.fillStyle = color;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 8;
+      const glowColor = type === 'bobi' ? '#38bdf8' : '#f43f5e';
+      const innerColor = type === 'bobi' ? '#083344' : '#4c0519';
 
-      const mouthAngle = 0.25 * Math.abs(Math.sin(Date.now() / 150));
+      // Chomp animation: mouth opening between 0.05 and 0.28 PI
+      // When moving, lively chomp rhythm; when stopped, cute slight parting
+      const chompVal = isMoving ? Math.abs(Math.sin(chompTimer || (Date.now() / 110))) : 0.18;
+      const mouthAngle = 0.05 + chompVal * 0.25; // 0.05 PI (~9 deg) to 0.30 PI (~54 deg)
+
+      // Outer Glow
+      ctx.shadowColor = glowColor;
+      ctx.shadowBlur = 10;
+
+      // Inner mouth dark background
+      ctx.fillStyle = innerColor;
       ctx.beginPath();
-      ctx.arc(0, 0, 14, mouthAngle * Math.PI, (2 - mouthAngle) * Math.PI);
+      ctx.arc(0, 0, 15, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Main Pac-Man Body Wedge
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(0, 0, 15, mouthAngle * Math.PI, (2 - mouthAngle) * Math.PI);
       ctx.lineTo(0, 0);
       ctx.closePath();
       ctx.fill();
 
-      // Eye
-      ctx.fillStyle = '#000';
+      // 2.5D Glossy Highlight arc on top curve
+      ctx.shadowBlur = 0;
       ctx.beginPath();
-      ctx.arc(2, -6, 2.5, 0, Math.PI * 2);
+      ctx.arc(0, -2, 12, Math.PI * 1.15, Math.PI * 1.65);
+      ctx.lineWidth = 2.2;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.stroke();
+
+      // Expressive Mascot Eye
+      // Eye White / Sclera
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(3.5, -7.5, 3.8, 0, Math.PI * 2);
       ctx.fill();
+
+      // Pupil (looking forward toward mouth direction)
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(4.6, -7.5, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // White Catchlight / Twinkle Highlight
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(5.4, -8.3, 1.0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Unique character mascot accessories:
+      if (type === 'bona') {
+        // Bona's cute hair ribbon / bow on top
+        ctx.fillStyle = '#f43f5e';
+        ctx.beginPath();
+        ctx.arc(-2, -15, 3.5, 0, Math.PI * 2);
+        ctx.arc(4, -15, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffd700';
+        ctx.beginPath();
+        ctx.arc(1, -15, 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Bobi's cute cyber antenna or cap badge
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(-1, -17, 2, 3);
+        ctx.fillStyle = '#00e5ff';
+        ctx.beginPath();
+        ctx.arc(0, -18, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       ctx.restore();
     };

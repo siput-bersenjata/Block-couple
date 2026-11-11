@@ -864,6 +864,9 @@ class NetworkManager {
           peer.vx = data.vx;
           peer.vy = data.vy;
           peer.facing = data.facing;
+          if (data.pacAngle !== undefined) peer.pacAngle = data.pacAngle;
+          if (data.isMoving !== undefined) peer.isMoving = data.isMoving;
+          if (data.chompTimer !== undefined) peer.chompTimer = data.chompTimer;
           peer.isGrounded = data.isGrounded;
           peer.targetTilt = data.tilt || 0;
           peer.targetSquashX = data.squashX || 1;
