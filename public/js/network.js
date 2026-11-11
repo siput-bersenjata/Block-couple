@@ -122,14 +122,16 @@ class NetworkManager {
     return null;
   }
 
-  saveSession(levelIndex = 0) {
+  saveSession(levelIndex = 0, gameId = null) {
     try {
+      if (gameId) this.currentGameId = gameId;
       const sessionData = {
         roomCode: this.roomCode,
         isHost: this.isHost,
         slot: this.slot,
         username: this.username,
         levelIndex: levelIndex,
+        gameId: this.currentGameId || 1,
         isPublic: this.isPublic,
         inCatalog: !!this.inCatalog,
         scores: this.scores,
@@ -197,6 +199,7 @@ class NetworkManager {
       this.slot = session.slot;
       this.isPublic = !!session.isPublic;
       if (session.scores) this.scores = session.scores;
+      if (session.gameId) this.currentGameId = session.gameId;
 
       // If user refreshed while in the Game Catalog, stay in the Game Catalog!
       if (session.inCatalog) {
@@ -1010,19 +1013,27 @@ class NetworkManager {
     }
 
     // Save session so accidental refresh resumes in-game
-    this.saveSession(levelIdx);
+    this.saveSession(levelIdx, this.currentGameId);
 
     // Initialize or re-attach game instance with position restoration
     if (!this.game) {
       this.game = new window.GameEngine();
       this.game.setSlot(slot);
       this.game.myPlayer.name = this.username;
-      this.game.loadLevel(levelIdx, levelStart, restorePos);
+      if (this.currentGameId && typeof this.game.loadGame === 'function') {
+        this.game.loadGame(this.currentGameId, levelIdx, levelStart, restorePos);
+      } else {
+        this.game.loadLevel(levelIdx, levelStart, restorePos);
+      }
       this.game.start();
     } else {
       this.game.setSlot(slot);
       this.game.myPlayer.name = this.username;
-      this.game.loadLevel(levelIdx, levelStart, restorePos);
+      if (this.currentGameId && typeof this.game.loadGame === 'function') {
+        this.game.loadGame(this.currentGameId, levelIdx, levelStart, restorePos);
+      } else {
+        this.game.loadLevel(levelIdx, levelStart, restorePos);
+      }
     }
 
     this.updateRoomBadgeCount(players.length);
@@ -1373,9 +1384,10 @@ class NetworkManager {
       this.game.peerPlayer.connected = (this.conn && this.conn.open);
     }
 
+    this.currentGameId = gameId || 1;
     this.updateRoomBadgeCount((this.conn && this.conn.open) ? 2 : 1);
     this.updateRoleBadge();
-    this.saveSession(levelIndex);
+    this.saveSession(levelIndex, this.currentGameId);
 
     window.audioManager && window.audioManager.startBGM();
     const gameObj = window.COOP_GAMES?.find(g => g.id === gameId);

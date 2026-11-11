@@ -81,12 +81,19 @@
         if (btnClear) btnClear.classList.add('hidden');
         if (btnUp) btnUp.classList.remove('hidden');
         if (banner) banner.innerText = 'Pecahkan soal matematika di atas! Lompat dan injak portal angka yang benar bersama partner!';
-      } else if (this.gameMode === 'pong' || this.gameMode === 'snake') {
-        if (btnJump) btnJump.querySelector('.btn-main-label').innerText = 'AKSI';
+      } else if (this.gameMode === 'snake') {
+        if (btnJump) btnJump.querySelector('.btn-main-label').innerText = 'BAWAH';
+        if (btnPlace) btnPlace.classList.remove('hidden');
+        if (btnPlace) btnPlace.querySelector('.btn-main-label').innerText = 'TURBO';
+        if (btnClear) btnClear.classList.add('hidden');
+        if (btnUp) btnUp.classList.remove('hidden');
+        if (banner) banner.innerText = 'Kendalikan ular dengan 4 arah! Makan bintang energi emas dan raih rekor skor bersama partner!';
+      } else if (this.gameMode === 'pong') {
+        if (btnJump) btnJump.querySelector('.btn-main-label').innerText = 'BAWAH';
         if (btnPlace) btnPlace.classList.add('hidden');
         if (btnClear) btnClear.classList.add('hidden');
         if (btnUp) btnUp.classList.remove('hidden');
-        if (banner) banner.innerText = 'Kendalikan dengan gesit untuk meraih rekor skor co-op tertinggi!';
+        if (banner) banner.innerText = 'Gerakkan raket ke atas & bawah untuk menangkis bola energi neon bersama partner!';
       } else {
         // Platformer
         if (btnJump) btnJump.querySelector('.btn-main-label').innerText = 'LOMPAT';
@@ -716,7 +723,7 @@
         { x: 860, y: 460 }
       ];
 
-      this.addFloatingText(480, 260, 'DUO PAC-MAZE: PESTA TITIK ENERGI', '#ffd700', 32);
+      this.addFloatingText(480, 260, (this.gameTitle || 'DUO PAC-MAZE').toUpperCase(), '#ffd700', 28);
     };
 
     GameEngine.prototype.updatePacman = function(dt) {
@@ -1093,14 +1100,532 @@
       ctx.restore();
     };
 
-    // ========================================================
-    // 5. PONG MODE & 6. SNAKE MODE STUBS
-    // ========================================================
-    GameEngine.prototype.initPongMode = function(lvl) {
-      this.initMathMode(lvl); // Fallback to math mode with custom skin
+    GameEngine.prototype.renderFloatingTexts = function(ctx) {
+      if (typeof this.renderOverlays === 'function') {
+        this.renderOverlays(ctx);
+      }
     };
-    GameEngine.prototype.initSnakeMode = function(lvl) {
-      this.initPacmanMode(lvl); // Fallback to pacman mode
+
+    // ========================================================
+    // 5. SNAKE MODE (DUO SNAKE: PEMBURU BINTANG ENERGI)
+    // ========================================================
+    GameEngine.prototype.initSnakeMode = function(levelIndex) {
+      this.camera.x = 0;
+      this.camera.y = 0;
+      this.camera.targetX = 0;
+      this.camera.tilt = 0;
+
+      const cellSize = 20;
+      this.snake = {
+        cellSize: cellSize,
+        stepTimer: 0,
+        stepInterval: 0.11,
+        score: 0,
+        stars: [],
+        minX: 3,
+        maxX: 44,
+        minY: 3,
+        maxY: 23,
+        p1: {
+          body: [
+            { x: 12, y: 13 },
+            { x: 11, y: 13 },
+            { x: 10, y: 13 },
+            { x: 9, y: 13 }
+          ],
+          dir: { x: 1, y: 0 },
+          nextDir: { x: 1, y: 0 },
+          color: '#00e5ff',
+          name: 'Bobi',
+          type: 'bobi',
+          length: 4
+        },
+        p2: {
+          body: [
+            { x: 35, y: 13 },
+            { x: 36, y: 13 },
+            { x: 37, y: 13 },
+            { x: 38, y: 13 }
+          ],
+          dir: { x: -1, y: 0 },
+          nextDir: { x: -1, y: 0 },
+          color: '#ff3b77',
+          name: 'Bona',
+          type: 'bona',
+          length: 4
+        }
+      };
+
+      // Spawn initial energy stars
+      this.spawnSnakeStars(5);
+
+      this.addFloatingText(480, 260, (this.gameTitle || 'DUO SNAKE: PEMBURU BINTANG ENERGI').toUpperCase(), '#00e5ff', 28);
+    };
+
+    GameEngine.prototype.spawnSnakeStars = function(count) {
+      if (!this.snake) return;
+      const s = this.snake;
+      for (let i = 0; i < count; i++) {
+        if (s.stars.length >= 8) break;
+        const x = Math.floor(s.minX + 1 + Math.random() * (s.maxX - s.minX - 2));
+        const y = Math.floor(s.minY + 1 + Math.random() * (s.maxY - s.minY - 2));
+        const exists = s.stars.some(st => st.x === x && st.y === y);
+        if (!exists) {
+          const isMega = Math.random() < 0.25;
+          s.stars.push({
+            x,
+            y,
+            isMega,
+            points: isMega ? 50 : 15,
+            spawnTime: Date.now()
+          });
+        }
+      }
+    };
+
+    GameEngine.prototype.updateSnake = function(dt) {
+      const s = this.snake;
+      if (!s) return;
+
+      const mySnake = this.localSlot === 1 ? s.p1 : s.p2;
+      const peerSnake = this.localSlot === 1 ? s.p2 : s.p1;
+
+      // Local player steering
+      let nd = mySnake.nextDir;
+      if (this.keysDown['arrowleft'] || this.keysDown['a'] || this.touchState.left) {
+        if (mySnake.dir.x !== 1) nd = { x: -1, y: 0 };
+      } else if (this.keysDown['arrowright'] || this.keysDown['d'] || this.touchState.right) {
+        if (mySnake.dir.x !== -1) nd = { x: 1, y: 0 };
+      } else if (this.keysDown['arrowup'] || this.keysDown['w'] || this.touchState.up) {
+        if (mySnake.dir.y !== 1) nd = { x: 0, y: -1 };
+      } else if (this.keysDown['arrowdown'] || this.keysDown['s'] || this.touchState.down || this.touchState.jump) {
+        if (mySnake.dir.y !== -1) nd = { x: 0, y: 1 };
+      }
+      mySnake.nextDir = nd;
+
+      // Turbo boost when holding place button or shift
+      const isTurbo = this.keysDown['shift'] || this.keysDown[' '] || this.touchState.place;
+      const stepSpeed = isTurbo ? s.stepInterval * 0.55 : s.stepInterval;
+
+      // Autonomous partner AI steering toward nearest star when playing solo
+      if (!this.peerPlayer.connected) {
+        if (s.stars.length > 0) {
+          const head = peerSnake.body[0];
+          let closest = s.stars[0];
+          let minDist = Math.abs(closest.x - head.x) + Math.abs(closest.y - head.y);
+          for (let i = 1; i < s.stars.length; i++) {
+            const d = Math.abs(s.stars[i].x - head.x) + Math.abs(s.stars[i].y - head.y);
+            if (d < minDist) { minDist = d; closest = s.stars[i]; }
+          }
+          let pd = peerSnake.dir;
+          if (closest.x > head.x && peerSnake.dir.x !== -1) pd = { x: 1, y: 0 };
+          else if (closest.x < head.x && peerSnake.dir.x !== 1) pd = { x: -1, y: 0 };
+          else if (closest.y > head.y && peerSnake.dir.y !== -1) pd = { x: 0, y: 1 };
+          else if (closest.y < head.y && peerSnake.dir.y !== 1) pd = { x: 0, y: -1 };
+          peerSnake.nextDir = pd;
+        }
+      }
+
+      s.stepTimer += dt;
+      if (s.stepTimer >= stepSpeed) {
+        s.stepTimer = 0;
+
+        this.stepOneSnake(mySnake);
+        this.stepOneSnake(peerSnake);
+
+        if (s.stars.length < 4) {
+          this.spawnSnakeStars(2);
+        }
+      }
+    };
+
+    GameEngine.prototype.stepOneSnake = function(snk) {
+      const s = this.snake;
+      snk.dir = snk.nextDir;
+      const head = snk.body[0];
+      let newHead = { x: head.x + snk.dir.x, y: head.y + snk.dir.y };
+
+      // Wrap around arena borders
+      if (newHead.x < s.minX) newHead.x = s.maxX;
+      if (newHead.x > s.maxX) newHead.x = s.minX;
+      if (newHead.y < s.minY) newHead.y = s.maxY;
+      if (newHead.y > s.maxY) newHead.y = s.minY;
+
+      // Check star collision
+      let eatenIdx = -1;
+      for (let i = 0; i < s.stars.length; i++) {
+        if (s.stars[i].x === newHead.x && s.stars[i].y === newHead.y) {
+          eatenIdx = i;
+          break;
+        }
+      }
+
+      if (eatenIdx !== -1) {
+        const star = s.stars[eatenIdx];
+        s.stars.splice(eatenIdx, 1);
+        s.score += star.points;
+        snk.length += star.isMega ? 2 : 1;
+
+        const px = newHead.x * s.cellSize + s.cellSize / 2;
+        const py = newHead.y * s.cellSize + s.cellSize / 2;
+        this.addFloatingText(px, py - 12, `+${star.points}`, star.isMega ? '#00e5ff' : '#ffd700', 20);
+        this.createCoinParticles(px, py, star.isMega ? '#00e5ff' : '#ffd700');
+        if (window.audioManager && window.audioManager.playKey) {
+          window.audioManager.playKey();
+        }
+      }
+
+      snk.body.unshift(newHead);
+      while (snk.body.length > snk.length) {
+        snk.body.pop();
+      }
+    };
+
+    GameEngine.prototype.renderSnake = function() {
+      const ctx = this.ctx;
+      const s = this.snake;
+      if (!s) return;
+
+      // Background Cyber Grid
+      ctx.fillStyle = '#060a16';
+      ctx.fillRect(0, 0, 960, 540);
+
+      // Arena Board Outline
+      const boardX = s.minX * s.cellSize;
+      const boardY = s.minY * s.cellSize;
+      const boardW = (s.maxX - s.minX + 1) * s.cellSize;
+      const boardH = (s.maxY - s.minY + 1) * s.cellSize;
+
+      ctx.save();
+      ctx.strokeStyle = '#1e3a8a';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(boardX - 4, boardY - 4, boardW + 8, boardH + 8);
+
+      // Grid Dots
+      ctx.fillStyle = 'rgba(0, 229, 255, 0.08)';
+      for (let x = s.minX; x <= s.maxX; x += 2) {
+        for (let y = s.minY; y <= s.maxY; y += 2) {
+          ctx.fillRect(x * s.cellSize + 9, y * s.cellSize + 9, 2, 2);
+        }
+      }
+      ctx.restore();
+
+      // Render Energy Stars
+      const animAngle = (Date.now() / 400);
+      for (const st of s.stars) {
+        const sx = st.x * s.cellSize + s.cellSize / 2;
+        const sy = st.y * s.cellSize + s.cellSize / 2;
+        this.drawEnergyStar(ctx, sx, sy, st.isMega, animAngle);
+      }
+
+      // Render Snakes (Bobi & Bona)
+      this.drawOneSnake(ctx, s.p1);
+      this.drawOneSnake(ctx, s.p2);
+
+      // Particles & Floating Text
+      this.renderParticles(ctx);
+      this.renderFloatingTexts(ctx);
+
+      // In-game Mode HUD
+      ctx.save();
+      ctx.font = '700 16px Outfit, sans-serif';
+      ctx.fillStyle = '#00e5ff';
+      ctx.fillText(`BOBI: ${s.p1.length} SEGMEN`, boardX, 32);
+      ctx.fillStyle = '#ff3b77';
+      ctx.fillText(`BONA: ${s.p2.length} SEGMEN`, boardX + 220, 32);
+      ctx.fillStyle = '#ffd700';
+      ctx.textAlign = 'right';
+      ctx.fillText(`SKOR DUO: ${s.score} PTS`, boardX + boardW, 32);
+      ctx.restore();
+    };
+
+    GameEngine.prototype.drawOneSnake = function(ctx, snk) {
+      const s = this.snake;
+      const cs = s.cellSize;
+
+      // Draw Body Segments (tail to head-1)
+      for (let i = snk.body.length - 1; i >= 1; i--) {
+        const seg = snk.body[i];
+        const segX = seg.x * cs;
+        const segY = seg.y * cs;
+        const alpha = Math.max(0.35, 1 - (i / (snk.body.length + 4)) * 0.5);
+
+        ctx.save();
+        ctx.fillStyle = snk.color;
+        ctx.globalAlpha = alpha;
+        ctx.shadowColor = snk.color;
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        drawRoundRect(ctx, segX + 2, segY + 2, cs - 4, cs - 4, 5);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Draw Snake Head (with cute mascot eyes!)
+      const head = snk.body[0];
+      const hx = head.x * cs;
+      const hy = head.y * cs;
+
+      ctx.save();
+      ctx.fillStyle = snk.color;
+      ctx.shadowColor = snk.color;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      drawRoundRect(ctx, hx + 1, hy + 1, cs - 2, cs - 2, 6);
+      ctx.fill();
+
+      // Eyes
+      ctx.fillStyle = '#000000';
+      const eyeDx = snk.dir.x;
+      const eyeDy = snk.dir.y;
+      if (eyeDx !== 0) {
+        const ox = eyeDx > 0 ? 12 : 4;
+        ctx.fillRect(hx + ox, hy + 5, 3, 4);
+        ctx.fillRect(hx + ox, hy + 11, 3, 4);
+      } else {
+        const oy = eyeDy > 0 ? 12 : 4;
+        ctx.fillRect(hx + 5, hy + oy, 4, 3);
+        ctx.fillRect(hx + 11, hy + oy, 4, 3);
+      }
+
+      // Bona's cute hairclip
+      if (snk.type === 'bona') {
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(hx + 4, hy + 4, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    };
+
+    GameEngine.prototype.drawEnergyStar = function(ctx, cx, cy, isMega, angle) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+
+      const color = isMega ? '#00e5ff' : '#ffd700';
+      const rOuter = isMega ? 12 : 8;
+      const rInner = isMega ? 5 : 3.5;
+
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = isMega ? 16 : 8;
+
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const r = (i % 2 === 0) ? rOuter : rInner;
+        const a = (i * Math.PI) / 4;
+        const x = Math.cos(a) * r;
+        const y = Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    };
+
+    // ========================================================
+    // 6. PONG MODE (NEON PONG: PERTARUNGAN REFLEKS)
+    // ========================================================
+    GameEngine.prototype.initPongMode = function(levelIndex) {
+      this.camera.x = 0;
+      this.camera.y = 0;
+      this.camera.targetX = 0;
+      this.camera.tilt = 0;
+
+      this.pong = {
+        p1: { x: 50, y: 270, w: 18, h: 90, vy: 0, color: '#00e5ff', name: 'Bobi', type: 'bobi' },
+        p2: { x: 910, y: 270, w: 18, h: 90, vy: 0, color: '#ff3b77', name: 'Bona', type: 'bona' },
+        ball: {
+          x: 480,
+          y: 270,
+          vx: 380 * (Math.random() > 0.5 ? 1 : -1),
+          vy: 180 * (Math.random() > 0.5 ? 1 : -1),
+          radius: 9,
+          speed: 400
+        },
+        rally: 0,
+        maxRally: 0,
+        score: 0,
+        trail: []
+      };
+
+      this.addFloatingText(480, 260, (this.gameTitle || 'NEON PONG: PERTARUNGAN REFLEKS').toUpperCase(), '#00e5ff', 28);
+    };
+
+    GameEngine.prototype.updatePong = function(dt) {
+      const p = this.pong;
+      if (!p) return;
+
+      const myPad = this.localSlot === 1 ? p.p1 : p.p2;
+      const peerPad = this.localSlot === 1 ? p.p2 : p.p1;
+
+      // Local player paddle movement
+      let moveDir = 0;
+      if (this.keysDown['arrowup'] || this.keysDown['w'] || this.touchState.up) moveDir -= 1;
+      if (this.keysDown['arrowdown'] || this.keysDown['s'] || this.touchState.down || this.touchState.jump) moveDir += 1;
+
+      myPad.y += moveDir * 420 * dt;
+      myPad.y = Math.max(90, Math.min(450, myPad.y));
+
+      // Autonomous peer AI when playing solo
+      if (!this.peerPlayer.connected) {
+        const diff = p.ball.y - peerPad.y;
+        if (Math.abs(diff) > 12) {
+          peerPad.y += Math.sign(diff) * Math.min(Math.abs(diff), 360 * dt);
+        }
+        peerPad.y = Math.max(90, Math.min(450, peerPad.y));
+      }
+
+      // Ball Movement
+      const b = p.ball;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+
+      // Trail history
+      p.trail.unshift({ x: b.x, y: b.y, time: Date.now() });
+      if (p.trail.length > 8) p.trail.pop();
+
+      // Top and Bottom Neon Bumper Collisions
+      if (b.y <= 50 && b.vy < 0) {
+        b.y = 50;
+        b.vy = Math.abs(b.vy);
+        this.createCoinParticles(b.x, b.y, '#00e5ff');
+      } else if (b.y >= 490 && b.vy > 0) {
+        b.y = 490;
+        b.vy = -Math.abs(b.vy);
+        this.createCoinParticles(b.x, b.y, '#ff3b77');
+      }
+
+      // Paddle Collisions (Left & Right)
+      if (b.vx < 0 && b.x - b.radius <= p.p1.x + p.p1.w / 2 && b.x + b.radius >= p.p1.x - p.p1.w / 2) {
+        if (Math.abs(b.y - p.p1.y) <= p.p1.h / 2 + b.radius) {
+          b.vx = Math.abs(b.vx) * 1.05;
+          const hitOffset = (b.y - p.p1.y) / (p.p1.h / 2);
+          b.vy = hitOffset * 320;
+          p.rally++;
+          p.score += 10 * p.rally;
+          this.createCoinParticles(b.x, b.y, '#00e5ff');
+          if (p.rally % 5 === 0) {
+            this.addFloatingText(b.x, b.y - 18, `RELI x${p.rally}!`, '#00e5ff', 22);
+          }
+        }
+      }
+
+      if (b.vx > 0 && b.x + b.radius >= p.p2.x - p.p2.w / 2 && b.x - b.radius <= p.p2.x + p.p2.w / 2) {
+        if (Math.abs(b.y - p.p2.y) <= p.p2.h / 2 + b.radius) {
+          b.vx = -Math.abs(b.vx) * 1.05;
+          const hitOffset = (b.y - p.p2.y) / (p.p2.h / 2);
+          b.vy = hitOffset * 320;
+          p.rally++;
+          p.score += 10 * p.rally;
+          this.createCoinParticles(b.x, b.y, '#ff3b77');
+          if (p.rally % 5 === 0) {
+            this.addFloatingText(b.x, b.y - 18, `RELI x${p.rally}!`, '#ff3b77', 22);
+          }
+        }
+      }
+
+      // Out of bounds (Ball passed paddle)
+      if (b.x < 10 || b.x > 950) {
+        p.maxRally = Math.max(p.maxRally, p.rally);
+        p.rally = 0;
+        b.x = 480;
+        b.y = 270;
+        b.vx = 380 * (Math.random() > 0.5 ? 1 : -1);
+        b.vy = 180 * (Math.random() > 0.5 ? 1 : -1);
+        this.addFloatingText(480, 240, 'RELI BARU!', '#ffd700', 22);
+      }
+    };
+
+    GameEngine.prototype.renderPong = function() {
+      const ctx = this.ctx;
+      const p = this.pong;
+      if (!p) return;
+
+      // Dark Neon Court Background
+      ctx.fillStyle = '#060a16';
+      ctx.fillRect(0, 0, 960, 540);
+
+      // Court Borders & Center Line
+      ctx.save();
+      ctx.strokeStyle = '#1e3a8a';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(30, 40, 900, 460);
+
+      // Center Line (Dashed)
+      ctx.setLineDash([10, 10]);
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.25)';
+      ctx.beginPath();
+      ctx.moveTo(480, 40);
+      ctx.lineTo(480, 500);
+      ctx.stroke();
+
+      // Center Circle
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(480, 270, 60, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      // Ball Trail
+      for (let i = 0; i < p.trail.length; i++) {
+        const tr = p.trail[i];
+        const alpha = Math.max(0, 0.6 - (i / p.trail.length) * 0.6);
+        ctx.fillStyle = '#ffd700';
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(tr.x, tr.y, p.ball.radius * (1 - i * 0.08), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // Ball
+      ctx.save();
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.arc(p.ball.x, p.ball.y, p.ball.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Paddles
+      this.drawPongPaddle(ctx, p.p1);
+      this.drawPongPaddle(ctx, p.p2);
+
+      // Particles & Floating Text
+      this.renderParticles(ctx);
+      this.renderFloatingTexts(ctx);
+
+      // HUD Overlay
+      ctx.save();
+      ctx.font = '800 18px Outfit, sans-serif';
+      ctx.fillStyle = '#00e5ff';
+      ctx.fillText(`RELI: ${p.rally} HITS`, 480, 32);
+      ctx.font = '700 16px Outfit, sans-serif';
+      ctx.fillStyle = '#ffd700';
+      ctx.textAlign = 'right';
+      ctx.fillText(`SKOR: ${p.score} PTS`, 920, 32);
+      ctx.restore();
+    };
+
+    GameEngine.prototype.drawPongPaddle = function(ctx, pad) {
+      ctx.save();
+      ctx.fillStyle = pad.color;
+      ctx.shadowColor = pad.color;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      drawRoundRect(ctx, pad.x - pad.w / 2, pad.y - pad.h / 2, pad.w, pad.h, 9);
+      ctx.fill();
+
+      // Paddle mascot face indicator in center of paddle
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(pad.x - 4, pad.y - 6, 2, 4);
+      ctx.fillRect(pad.x + 2, pad.y - 6, 2, 4);
+      ctx.restore();
     };
 
     // Master dispatcher for update & render
@@ -1114,6 +1639,10 @@
         this.updatePacman(dt);
       } else if (this.gameMode === 'math') {
         this.updateMath(dt);
+      } else if (this.gameMode === 'pong') {
+        this.updatePong(dt);
+      } else if (this.gameMode === 'snake') {
+        this.updateSnake(dt);
       } else {
         origUpdate.call(this, dt);
       }
@@ -1129,6 +1658,10 @@
         this.renderPacman();
       } else if (this.gameMode === 'math') {
         this.renderMath();
+      } else if (this.gameMode === 'pong') {
+        this.renderPong();
+      } else if (this.gameMode === 'snake') {
+        this.renderSnake();
       } else {
         origRender.call(this);
       }
