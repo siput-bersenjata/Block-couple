@@ -12,6 +12,15 @@
     }
   }
 
+  // Precise Circle to AABB Rectangle Overlap test
+  function circleRectOverlap(cx, cy, radius, rx, ry, rw, rh) {
+    const closestX = Math.max(rx, Math.min(cx, rx + rw));
+    const closestY = Math.max(ry, Math.min(cy, ry + rh));
+    const dx = cx - closestX;
+    const dy = cy - closestY;
+    return (dx * dx + dy * dy) < (radius * radius);
+  }
+
   // Initialize Game Mode Extension
   function attachGameModes(GameEngine) {
     if (!GameEngine || !GameEngine.prototype) return;
@@ -563,13 +572,30 @@
 
       const speed = 200;
       if (vx !== 0 || vy !== 0) {
-        this.myPlayer.x += vx * speed * dt;
-        this.myPlayer.y += vy * speed * dt;
         this.myPlayer.angle = Math.atan2(vy, vx);
 
-        // Keep inside bounds
-        this.myPlayer.x = Math.max(50, Math.min(910, this.myPlayer.x));
-        this.myPlayer.y = Math.max(50, Math.min(490, this.myPlayer.y));
+        // Axis-separated movement with brick collision check (tank radius = 18)
+        let nextX = this.myPlayer.x + vx * speed * dt;
+        nextX = Math.max(50, Math.min(910, nextX));
+        let blockedX = false;
+        for (const b of t.bricks) {
+          if (circleRectOverlap(nextX, this.myPlayer.y, 18, b.x, b.y, 20, 20)) {
+            blockedX = true;
+            break;
+          }
+        }
+        if (!blockedX) this.myPlayer.x = nextX;
+
+        let nextY = this.myPlayer.y + vy * speed * dt;
+        nextY = Math.max(50, Math.min(490, nextY));
+        let blockedY = false;
+        for (const b of t.bricks) {
+          if (circleRectOverlap(this.myPlayer.x, nextY, 18, b.x, b.y, 20, 20)) {
+            blockedY = true;
+            break;
+          }
+        }
+        if (!blockedY) this.myPlayer.y = nextY;
       }
 
       // Firing Cannon
@@ -645,8 +671,19 @@
 
       // Update Enemy Tanks
       for (const e of t.enemyTanks) {
-        e.y += e.vy * dt;
-        if (e.y < 100 || e.y > 440) e.vy = -e.vy;
+        let nextY = e.y + e.vy * dt;
+        let blocked = false;
+        for (const b of t.bricks) {
+          if (circleRectOverlap(e.x, nextY, 20, b.x, b.y, 20, 20)) {
+            blocked = true;
+            break;
+          }
+        }
+        if (blocked || nextY < 70 || nextY > 470) {
+          e.vy = -e.vy;
+        } else {
+          e.y = nextY;
+        }
       }
 
       this.updatePeerInterpolation(dt);
@@ -767,35 +804,75 @@
       this.peerPlayer.isMoving = false;
       this.peerPlayer.chompTimer = 0;
 
+      // Solid Maze Walls (Outer Boundaries + Ghost House + Interior Corridors)
+      const walls = [
+        // Outer arena border walls (14px thickness)
+        { x: 50, y: 38, w: 860, h: 14 },   // Top border
+        { x: 50, y: 488, w: 860, h: 14 },  // Bottom border
+        { x: 48, y: 38, w: 14, h: 464 },   // Left border
+        { x: 898, y: 38, w: 14, h: 464 },  // Right border
+
+        // Ghost House (outer boundaries x: 360 to 600, y: 180 to 340)
+        { x: 360, y: 180, w: 16, h: 160 }, // Left wall
+        { x: 584, y: 180, w: 16, h: 160 }, // Right wall
+        { x: 360, y: 324, w: 240, h: 16 }, // Bottom wall
+        { x: 360, y: 180, w: 80, h: 16 },  // Top-left roof
+        { x: 520, y: 180, w: 80, h: 16 },  // Top-right roof
+
+        // Interior Maze Divider Corridors
+        { x: 160, y: 120, w: 120, h: 20 }, // Top-left horizontal bar
+        { x: 680, y: 120, w: 120, h: 20 }, // Top-right horizontal bar
+        { x: 160, y: 400, w: 120, h: 20 }, // Bottom-left horizontal bar
+        { x: 680, y: 400, w: 120, h: 20 }, // Bottom-right horizontal bar
+        { x: 210, y: 220, w: 20, h: 100 }, // Mid-left vertical bar
+        { x: 730, y: 220, w: 20, h: 100 }  // Mid-right vertical bar
+      ];
+
+      // Ghost House Top Gate (gap x: 440 to 520, y: 180) - Solid for players, exit-only for ghosts
+      const gate = { x: 440, y: 180, w: 80, h: 16 };
+
       this.pacman = {
         score: 0,
+        walls: walls,
+        gate: gate,
         dots: [],
         powerPellets: [],
         invulnerableTimer: 0,
         cleared: false,
         ghosts: [
-          { x: 440, y: 220, color: '#ef4444', name: 'Blinky', vx: 90, vy: 0, changeTimer: 1.5 },
-          { x: 520, y: 220, color: '#ec4899', name: 'Pinky', vx: -90, vy: 0, changeTimer: 1.8 },
-          { x: 480, y: 260, color: '#00e5ff', name: 'Inky', vx: 0, vy: 90, changeTimer: 2.2 }
+          { x: 440, y: 240, color: '#ef4444', name: 'Blinky', vx: 0, vy: -90, changeTimer: 1.0, state: 'exiting' },
+          { x: 520, y: 240, color: '#ec4899', name: 'Pinky', vx: 0, vy: -90, changeTimer: 1.5, state: 'exiting' },
+          { x: 480, y: 270, color: '#00e5ff', name: 'Inky', vx: 0, vy: -90, changeTimer: 2.0, state: 'exiting' }
         ],
         frightenedTimer: 0
       };
 
-      // Generate Dot Grid
-      for (let x = 100; x <= 860; x += 40) {
-        for (let y = 80; y <= 460; y += 40) {
-          // Avoid center ghost house
-          if (x > 380 && x < 580 && y > 180 && y < 320) continue;
-          this.pacman.dots.push({ x, y, radius: 3.5 });
+      // Generate Dot Grid strictly inside open corridors with wall clearance
+      for (let x = 90; x <= 870; x += 36) {
+        for (let y = 75; y <= 465; y += 36) {
+          // Never place dots inside or on ghost house perimeter
+          if (x >= 345 && x <= 615 && y >= 165 && y <= 350) continue;
+
+          // Check if dot overlaps or is within 18px of any wall
+          let collides = false;
+          for (const w of walls) {
+            if (circleRectOverlap(x, y, 18, w.x, w.y, w.w, w.h)) {
+              collides = true;
+              break;
+            }
+          }
+          if (!collides) {
+            this.pacman.dots.push({ x, y, radius: 3.5 });
+          }
         }
       }
 
-      // 4 Power Pellets in corners
+      // 4 Power Pellets in open corner corridors
       this.pacman.powerPellets = [
-        { x: 100, y: 80 },
-        { x: 860, y: 80 },
-        { x: 100, y: 460 },
-        { x: 860, y: 460 }
+        { x: 90, y: 75 },
+        { x: 870, y: 75 },
+        { x: 90, y: 465 },
+        { x: 870, y: 465 }
       ];
 
       this.addFloatingText(480, 260, (this.gameTitle || 'DUO PAC-MAZE').toUpperCase(), '#ffd700', 28);
@@ -823,17 +900,40 @@
       this.myPlayer.isMoving = isMoving;
 
       if (isMoving) {
-        this.myPlayer.x += vx * speed * dt;
-        this.myPlayer.y += vy * speed * dt;
+        const rad = 15;
+
+        // X movement with solid wall collision test
+        let nextX = this.myPlayer.x + vx * speed * dt;
+        let blockedX = false;
+        for (const w of p.walls) {
+          if (circleRectOverlap(nextX, this.myPlayer.y, rad, w.x, w.y, w.w, w.h)) {
+            blockedX = true;
+            break;
+          }
+        }
+        if (!blockedX && circleRectOverlap(nextX, this.myPlayer.y, rad, p.gate.x, p.gate.y, p.gate.w, p.gate.h)) {
+          blockedX = true;
+        }
+        if (!blockedX) this.myPlayer.x = nextX;
+
+        // Y movement with solid wall collision test
+        let nextY = this.myPlayer.y + vy * speed * dt;
+        let blockedY = false;
+        for (const w of p.walls) {
+          if (circleRectOverlap(this.myPlayer.x, nextY, rad, w.x, w.y, w.w, w.h)) {
+            blockedY = true;
+            break;
+          }
+        }
+        if (!blockedY && circleRectOverlap(this.myPlayer.x, nextY, rad, p.gate.x, p.gate.y, p.gate.w, p.gate.h)) {
+          blockedY = true;
+        }
+        if (!blockedY) this.myPlayer.y = nextY;
 
         // Exact 4-way orientation angle (0: right, Math.PI/2: down, Math.PI: left, -Math.PI/2: up)
         this.myPlayer.pacAngle = Math.atan2(vy, vx);
         this.myPlayer.facing = vx < 0 ? -1 : 1;
         this.myPlayer.chompTimer = (this.myPlayer.chompTimer || 0) + dt * (isTurbo ? 22 : 16);
-
-        // Clamping to arena boundaries
-        this.myPlayer.x = Math.max(68, Math.min(892, this.myPlayer.x));
-        this.myPlayer.y = Math.max(58, Math.min(482, this.myPlayer.y));
       }
 
       // Broadcast position and angle to peer via network
@@ -911,7 +1011,29 @@
 
       // Ghost roaming & collision
       for (const g of p.ghosts) {
-        // Ghost AI roam
+        // State 1: Exiting ghost house through the open top gate
+        if (g.state === 'exiting') {
+          const targetX = 480;
+          const targetY = 150;
+          const dx = targetX - g.x;
+          const dy = targetY - g.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist > 8) {
+            g.vx = (dx / dist) * 75;
+            g.vy = (dy / dist) * 75;
+            g.x += g.vx * dt;
+            g.y += g.vy * dt;
+          } else {
+            g.y = 150;
+            g.state = 'patrol';
+            g.vx = Math.random() > 0.5 ? 90 : -90;
+            g.vy = 0;
+            g.changeTimer = 1.0;
+          }
+          continue;
+        }
+
+        // State 2: Patrolling corridors outside house with full wall collision
         g.changeTimer = (g.changeTimer || 0) - dt;
         if (g.changeTimer <= 0) {
           g.changeTimer = 1.5 + Math.random() * 2;
@@ -921,47 +1043,62 @@
             { vx: 0, vy: 90 },
             { vx: 0, vy: -90 }
           ];
-          // If frightened, wander slower away from player
           if (p.frightenedTimer > 0) {
             const awayDir = Math.atan2(g.y - this.myPlayer.y, g.x - this.myPlayer.x);
             g.vx = Math.cos(awayDir) * 60;
             g.vy = Math.sin(awayDir) * 60;
-          } else {
-            // Chance to track player
-            if (Math.random() < 0.45) {
-              const toPlayer = Math.atan2(this.myPlayer.y - g.y, this.myPlayer.x - g.x);
-              // Pick closest cardinal direction
-              if (Math.abs(Math.cos(toPlayer)) > Math.abs(Math.sin(toPlayer))) {
-                g.vx = Math.cos(toPlayer) > 0 ? 95 : -95;
-                g.vy = 0;
-              } else {
-                g.vx = 0;
-                g.vy = Math.sin(toPlayer) > 0 ? 95 : -95;
-              }
+          } else if (Math.random() < 0.45) {
+            const toPlayer = Math.atan2(this.myPlayer.y - g.y, this.myPlayer.x - g.x);
+            if (Math.abs(Math.cos(toPlayer)) > Math.abs(Math.sin(toPlayer))) {
+              g.vx = Math.cos(toPlayer) > 0 ? 95 : -95;
+              g.vy = 0;
             } else {
-              const pick = dirs[Math.floor(Math.random() * dirs.length)];
-              g.vx = pick.vx;
-              g.vy = pick.vy;
+              g.vx = 0;
+              g.vy = Math.sin(toPlayer) > 0 ? 95 : -95;
             }
+          } else {
+            const pick = dirs[Math.floor(Math.random() * dirs.length)];
+            g.vx = pick.vx;
+            g.vy = pick.vy;
           }
         }
 
-        g.x += g.vx * dt;
-        g.y += g.vy * dt;
+        let testGX = g.x + g.vx * dt;
+        let testGY = g.y + g.vy * dt;
+        let ghostBlocked = false;
 
-        // Arena boundary bouncing
-        if (g.x < 70) { g.x = 70; g.vx = Math.abs(g.vx); }
-        if (g.x > 890) { g.x = 890; g.vx = -Math.abs(g.vx); }
-        if (g.y < 60) { g.y = 60; g.vy = Math.abs(g.vy); }
-        if (g.y > 480) { g.y = 480; g.vy = -Math.abs(g.vy); }
+        for (const w of p.walls) {
+          if (circleRectOverlap(testGX, testGY, 13, w.x, w.y, w.w, w.h)) {
+            ghostBlocked = true;
+            break;
+          }
+        }
+        if (!ghostBlocked && circleRectOverlap(testGX, testGY, 13, p.gate.x, p.gate.y, p.gate.w, p.gate.h)) {
+          ghostBlocked = true;
+        }
+
+        if (ghostBlocked) {
+          // Deflect and choose orthogonal direction
+          g.changeTimer = 0.5 + Math.random() * 0.8;
+          if (Math.abs(g.vx) > 0) {
+            g.vy = Math.random() > 0.5 ? 90 : -90;
+            g.vx = 0;
+          } else {
+            g.vx = Math.random() > 0.5 ? 90 : -90;
+            g.vy = 0;
+          }
+        } else {
+          g.x = testGX;
+          g.y = testGY;
+        }
 
         // Player touches ghost
         if (Math.hypot(this.myPlayer.x - g.x, this.myPlayer.y - g.y) < 24) {
           if (p.frightenedTimer > 0) {
             // Eat ghost!
             g.x = 480;
-            g.y = 260;
-            g.changeTimer = 2.0;
+            g.y = 250;
+            g.state = 'exiting';
             p.score += 200;
             this.createExplosion(g.x, g.y, '#00e5ff', 16);
             this.addFloatingText(this.myPlayer.x, this.myPlayer.y - 12, '+200 HANTU TERMAKAN!', '#00e5ff', 22);
@@ -996,31 +1133,29 @@
       ctx.fillStyle = '#060a16';
       ctx.fillRect(0, 0, 960, 540);
 
-      // Maze Wall Outer Borders (Cyberpunk double-line)
+      // Render Solid Maze Walls & Corridors
+      ctx.save();
       ctx.strokeStyle = '#1d4ed8';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(50, 40, 860, 460);
-
-      // Ghost House with Open Top Gate
-      ctx.strokeStyle = '#1e40af';
+      ctx.fillStyle = '#0f172a';
       ctx.lineWidth = 3;
-      ctx.beginPath();
-      // Left side of roof
-      ctx.moveTo(360, 180);
-      ctx.lineTo(440, 180);
-      // Gap for gate between 440 and 520
-      ctx.moveTo(520, 180);
-      ctx.lineTo(600, 180);
-      // Right wall
-      ctx.lineTo(600, 340);
-      // Floor
-      ctx.lineTo(360, 340);
-      // Left wall
-      ctx.lineTo(360, 180);
-      ctx.stroke();
+      ctx.shadowColor = '#1d4ed8';
+      ctx.shadowBlur = 8;
+
+      for (const w of p.walls) {
+        ctx.fillRect(w.x, w.y, w.w, w.h);
+        ctx.strokeRect(w.x, w.y, w.w, w.h);
+      }
 
       // Glowing Translucent Gate Barrier
-      ctx.save();
+      ctx.strokeStyle = '#ec4899';
+      ctx.shadowColor = '#ec4899';
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(p.gate.x + 2, p.gate.y + 8);
+      ctx.lineTo(p.gate.x + p.gate.w - 2, p.gate.y + 8);
+      ctx.stroke();
+      ctx.restore();
       ctx.strokeStyle = '#ec4899';
       ctx.shadowColor = '#ec4899';
       ctx.shadowBlur = 8;
