@@ -238,7 +238,15 @@
       <!-- CATALOG 20 GAMES GRID SECTION -->
       <div class="catalog-section-label">
         <span>DAFTAR 20 GAME CO-OP TERSEDIA</span>
-        <span class="catalog-count-pill">20 Game</span>
+        <span id="catalogCountPill" class="catalog-count-pill">20 Game</span>
+      </div>
+
+      <!-- QUICK FILTER TABS -->
+      <div class="catalog-filter-bar">
+        <button class="catalog-filter-btn active" data-filter="all">Semua Game (20)</button>
+        <button class="catalog-filter-btn" data-filter="easy">Tingkat Awal (Level 1-3)</button>
+        <button class="catalog-filter-btn" data-filter="mid">Tingkat Menengah (Level 4-7)</button>
+        <button class="catalog-filter-btn" data-filter="hard">Tingkat Mahir (Level 8-10)</button>
       </div>
 
       <div id="catalogGamesGrid" class="catalog-games-grid">
@@ -486,11 +494,25 @@
       }
 
       // Render 20 Co-op games in Catalog with Illustration & Live Gameplay Previews
-      window.renderGameCatalog = function() {
+      let currentCatalogFilter = 'all';
+      window.renderGameCatalog = function(filterCategory = currentCatalogFilter) {
+        currentCatalogFilter = filterCategory;
         const container = document.getElementById('catalogGamesGrid');
         if (!container || !window.COOP_GAMES) return;
 
-        container.innerHTML = window.COOP_GAMES.map((game) => {
+        let list = window.COOP_GAMES;
+        if (filterCategory === 'easy') {
+          list = list.filter(g => g.targetLevel <= 3);
+        } else if (filterCategory === 'mid') {
+          list = list.filter(g => g.targetLevel >= 4 && g.targetLevel <= 7);
+        } else if (filterCategory === 'hard') {
+          list = list.filter(g => g.targetLevel >= 8);
+        }
+
+        const countPill = document.getElementById('catalogCountPill');
+        if (countPill) countPill.innerText = `${list.length} Game`;
+
+        container.innerHTML = list.map((game) => {
           const gameNum = game.id < 10 ? '0' + game.id : game.id;
           return `
             <div class="catalog-game-card" data-game-id="${game.id}">
@@ -529,6 +551,16 @@
           setTimeout(() => window.CatalogPreviewManager.init(), 10);
         }
       };
+
+      // Filter tabs event listener
+      document.querySelectorAll('.catalog-filter-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          document.querySelectorAll('.catalog-filter-btn').forEach(b => b.classList.remove('active'));
+          e.currentTarget.classList.add('active');
+          const filter = e.currentTarget.getAttribute('data-filter');
+          window.renderGameCatalog(filter);
+        });
+      });
 
       // Initial render of catalog
       window.renderGameCatalog();
