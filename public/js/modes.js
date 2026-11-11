@@ -4,6 +4,14 @@
 (function() {
   if (typeof window === 'undefined') return;
 
+  function drawRoundRect(ctx, x, y, w, h, r = 4) {
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(x, y, w, h, r);
+    } else {
+      ctx.rect(x, y, w, h);
+    }
+  }
+
   // Initialize Game Mode Extension
   function attachGameModes(GameEngine) {
     if (!GameEngine || !GameEngine.prototype) return;
@@ -649,7 +657,7 @@
       ctx.shadowColor = color;
       ctx.shadowBlur = 8;
       ctx.beginPath();
-      ctx.roundRect(-14, -10, 28, 20, 4);
+      drawRoundRect(ctx, -14, -10, 28, 20, 4);
       ctx.fill();
 
       // Cannon Turret
@@ -1028,7 +1036,7 @@
       ctx.shadowColor = '#00e5ff';
       ctx.shadowBlur = 15;
       ctx.beginPath();
-      ctx.roundRect(280, 50, 400, 110, 14);
+      drawRoundRect(ctx, 280, 50, 400, 110, 14);
       ctx.fill();
       ctx.stroke();
 
@@ -1055,7 +1063,7 @@
         ctx.shadowColor = '#00e5ff';
         ctx.shadowBlur = 10;
         ctx.beginPath();
-        ctx.roundRect(p.x - 45, p.y - 15, 90, 30, 8);
+        drawRoundRect(ctx, p.x - 45, p.y - 15, 90, 30, 8);
         ctx.fill();
         ctx.stroke();
 
@@ -1136,3 +1144,4 @@
     });
   }
 })();
+

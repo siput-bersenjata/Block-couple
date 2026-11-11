@@ -1273,6 +1273,7 @@ body, html {
   max-width: 980px;
   width: 100%;
   max-height: 94vh;
+  min-height: 520px;
   overflow-y: auto;
   scroll-behavior: smooth;
   scrollbar-gutter: stable;

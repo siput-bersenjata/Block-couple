@@ -3,6 +3,14 @@
 // Supports Space Shooter, Tank Battle, Pac-Man, Math Challenge, Pong, Snake, and Platformer.
 
 (function() {
+  function drawRoundRect(ctx, x, y, w, h, r = 4) {
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(x, y, w, h, r);
+    } else {
+      ctx.rect(x, y, w, h);
+    }
+  }
+
   const PREVIEW_CONFIGS = {
     // 1. Shooter (Tembak-Tembakan)
     1: { genre: 'shooter', name: 'Space Blaster', bg: ['#030712', '#0f172a'], accent: '#00e5ff' },
@@ -306,7 +314,7 @@
     ctx.shadowColor = '#00e5ff';
     ctx.shadowBlur = 10;
     ctx.beginPath();
-    ctx.roundRect(w * 0.25, 12, w * 0.5, 42, 8);
+    drawRoundRect(ctx, w * 0.25, 12, w * 0.5, 42, 8);
     ctx.fill();
     ctx.stroke();
 
@@ -330,7 +338,7 @@
       ctx.shadowColor = isCorrectP ? '#10b981' : '#00e5ff';
       ctx.shadowBlur = isCorrectP ? 12 : 6;
       ctx.beginPath();
-      ctx.roundRect(p.x - 24, h * 0.74 - 16, 48, 20, 6);
+      drawRoundRect(ctx, p.x - 24, h * 0.74 - 16, 48, 20, 6);
       ctx.fill();
       ctx.stroke();
 
@@ -462,7 +470,7 @@
     ctx.shadowColor = ctx.fillStyle;
     ctx.shadowBlur = 6;
     ctx.beginPath();
-    ctx.roundRect(-10, -10, 20, 20, 4);
+    drawRoundRect(ctx, -10, -10, 20, 20, 4);
     ctx.fill();
 
     // Eyes

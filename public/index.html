@@ -369,7 +369,108 @@
 
   <!-- UI Event Bindings & LocalStorage -->
   <script>
+    // Global Toast Notification Helper
+    window.showToast = function showToast(msg) {
+      const toast = document.getElementById('toast');
+      if (!toast) return;
+      toast.innerText = msg;
+      toast.classList.remove('hidden');
+      toast.classList.add('visible');
+      setTimeout(() => {
+        toast.classList.remove('visible');
+        setTimeout(() => toast.classList.add('hidden'), 300);
+      }, 2500);
+    };
+
+    // Render 20 Co-op games in Catalog with Illustration & Live Gameplay Previews
+    let currentCatalogFilter = 'all';
+    window.renderGameCatalog = function(filterCategory = currentCatalogFilter) {
+      currentCatalogFilter = filterCategory;
+      const container = document.getElementById('catalogGamesGrid');
+      if (!container || !window.COOP_GAMES) return;
+
+      let list = window.COOP_GAMES;
+      if (filterCategory === 'shooter') {
+        list = list.filter(g => g.mode === 'shooter');
+      } else if (filterCategory === 'tank') {
+        list = list.filter(g => g.mode === 'tank');
+      } else if (filterCategory === 'pacman') {
+        list = list.filter(g => g.mode === 'pacman');
+      } else if (filterCategory === 'math') {
+        list = list.filter(g => g.mode === 'math');
+      } else if (filterCategory === 'arcade') {
+        list = list.filter(g => g.mode === 'pong' || g.mode === 'snake');
+      } else if (filterCategory === 'platformer') {
+        list = list.filter(g => g.mode === 'platformer');
+      }
+
+      const countPill = document.getElementById('catalogCountPill');
+      if (countPill) countPill.innerText = `${list.length} Game`;
+
+      container.innerHTML = list.map((game) => {
+        const gameNum = game.id < 10 ? '0' + game.id : game.id;
+        return `
+          <div class="catalog-game-card" data-game-id="${game.id}">
+            <div class="card-header-row">
+              <span class="game-number">GAME #${gameNum}</span>
+              <span class="game-tag-badge">${game.tag}</span>
+            </div>
+
+            <div class="game-preview-container" data-game-id="${game.id}">
+              <canvas class="game-preview-canvas" width="280" height="140" data-game-id="${game.id}"></canvas>
+              <div class="preview-badge">
+                <span class="badge-dot"></span>
+                <span class="badge-text">CUPLIKAN GAMEPLAY</span>
+              </div>
+              <div class="preview-hover-hint">Arahkan kursor untuk cuplikan gerak</div>
+            </div>
+
+            <h3 class="game-card-title" title="Arahkan kursor untuk cuplikan gerak">${game.title}</h3>
+            <p class="game-card-desc">${game.desc}</p>
+            
+            <div class="game-level-select-row">
+              <label for="levelSelect_${game.id}" class="level-select-label">Pilihan Level:</label>
+              <select id="levelSelect_${game.id}" class="game-level-dropdown">
+                ${Array.from({ length: 10 }, (_, i) => `<option value="${i + 1}" ${i + 1 === game.targetLevel ? 'selected' : ''}>Level ${i + 1}</option>`).join('')}
+              </select>
+            </div>
+
+            <button class="btn-launch-game" onclick="window.networkManager.launchGame(${game.id}, parseInt(document.getElementById('levelSelect_${game.id}').value) - 1)">
+              <span>Mainkan Game</span>
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      if (window.CatalogPreviewManager) {
+        setTimeout(() => window.CatalogPreviewManager.init(), 10);
+      }
+    };
+
+    function copyRoomLink() {
+      const url = window.location.href;
+      navigator.clipboard.writeText(url).then(() => {
+        window.showToast('Link room berhasil disalin!');
+      }).catch(() => {
+        prompt('Salin link ini untuk temanmu:', url);
+      });
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
+      // 1. Initial render of 20 games into catalog grid immediately
+      window.renderGameCatalog('all');
+
+      // 2. Filter tabs event listener
+      document.querySelectorAll('.catalog-filter-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          document.querySelectorAll('.catalog-filter-btn').forEach(b => b.classList.remove('active'));
+          e.currentTarget.classList.add('active');
+          const filter = e.currentTarget.getAttribute('data-filter');
+          window.renderGameCatalog(filter);
+        });
+      });
+
+      // 3. Username Input setup
       const usernameInput = document.getElementById('usernameInput');
       const savedName = localStorage.getItem('blockCoupleUsername');
       if (savedName) {
@@ -385,11 +486,11 @@
         return name;
       }
 
-      // Check if user was already playing and accidentally refreshed
+      // 4. Check if user was already in a room/catalog and refreshed
       const resumed = window.networkManager.tryAutoResume();
       if (resumed) {
         window.audioManager.init();
-        showToast('Menyambung kembali ke permainan...');
+        window.showToast('Menyambung kembali ke sesi room...');
       }
 
       // Quick Match (Public Queue with 1-min timeout)
@@ -453,12 +554,7 @@
       });
 
       document.getElementById('btnCopyLink').addEventListener('click', () => {
-        const url = window.location.href;
-        navigator.clipboard.writeText(url).then(() => {
-          showToast('Link room berhasil disalin!');
-        }).catch(() => {
-          prompt('Salin link ini untuk temanmu:', url);
-        });
+        copyRoomLink();
       });
 
       document.getElementById('btnFullscreen').addEventListener('click', () => {
@@ -491,109 +587,10 @@
         }
       });
 
-      function copyRoomLink() {
-        const url = window.location.href;
-        navigator.clipboard.writeText(url).then(() => {
-          showToast('Link room berhasil disalin!');
-        }).catch(() => {
-          prompt('Salin link ini untuk temanmu:', url);
-        });
-      }
-
-      // Render 20 Co-op games in Catalog with Illustration & Live Gameplay Previews
-      let currentCatalogFilter = 'all';
-      window.renderGameCatalog = function(filterCategory = currentCatalogFilter) {
-        currentCatalogFilter = filterCategory;
-        const container = document.getElementById('catalogGamesGrid');
-        if (!container || !window.COOP_GAMES) return;
-
-        let list = window.COOP_GAMES;
-        if (filterCategory === 'shooter') {
-          list = list.filter(g => g.mode === 'shooter');
-        } else if (filterCategory === 'tank') {
-          list = list.filter(g => g.mode === 'tank');
-        } else if (filterCategory === 'pacman') {
-          list = list.filter(g => g.mode === 'pacman');
-        } else if (filterCategory === 'math') {
-          list = list.filter(g => g.mode === 'math');
-        } else if (filterCategory === 'arcade') {
-          list = list.filter(g => g.mode === 'pong' || g.mode === 'snake');
-        } else if (filterCategory === 'platformer') {
-          list = list.filter(g => g.mode === 'platformer');
-        }
-
-        const countPill = document.getElementById('catalogCountPill');
-        if (countPill) countPill.innerText = `${list.length} Game`;
-
-        container.innerHTML = list.map((game) => {
-          const gameNum = game.id < 10 ? '0' + game.id : game.id;
-          return `
-            <div class="catalog-game-card" data-game-id="${game.id}">
-              <div class="card-header-row">
-                <span class="game-number">GAME #${gameNum}</span>
-                <span class="game-tag-badge">${game.tag}</span>
-              </div>
-
-              <div class="game-preview-container" data-game-id="${game.id}">
-                <canvas class="game-preview-canvas" width="280" height="140" data-game-id="${game.id}"></canvas>
-                <div class="preview-badge">
-                  <span class="badge-dot"></span>
-                  <span class="badge-text">CUPLIKAN GAMEPLAY</span>
-                </div>
-                <div class="preview-hover-hint">Arahkan kursor untuk cuplikan gerak</div>
-              </div>
-
-              <h3 class="game-card-title" title="Arahkan kursor untuk cuplikan gerak">${game.title}</h3>
-              <p class="game-card-desc">${game.desc}</p>
-              
-              <div class="game-level-select-row">
-                <label for="levelSelect_${game.id}" class="level-select-label">Pilihan Level:</label>
-                <select id="levelSelect_${game.id}" class="game-level-dropdown">
-                  ${Array.from({ length: 10 }, (_, i) => `<option value="${i + 1}" ${i + 1 === game.targetLevel ? 'selected' : ''}>Level ${i + 1}</option>`).join('')}
-                </select>
-              </div>
-
-              <button class="btn-launch-game" onclick="window.networkManager.launchGame(${game.id}, parseInt(document.getElementById('levelSelect_${game.id}').value) - 1)">
-                <span>Mainkan Game</span>
-              </button>
-            </div>
-          `;
-        }).join('');
-
-        if (window.CatalogPreviewManager) {
-          setTimeout(() => window.CatalogPreviewManager.init(), 10);
-        }
-      };
-
-      // Filter tabs event listener
-      document.querySelectorAll('.catalog-filter-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          document.querySelectorAll('.catalog-filter-btn').forEach(b => b.classList.remove('active'));
-          e.currentTarget.classList.add('active');
-          const filter = e.currentTarget.getAttribute('data-filter');
-          window.renderGameCatalog(filter);
-        });
-      });
-
-      // Initial render of catalog
-      window.renderGameCatalog();
-
       document.getElementById('btnMute').addEventListener('click', (e) => {
         const isMuted = window.audioManager.toggleMute();
         e.target.innerText = isMuted ? 'Audio OFF' : 'Audio ON';
       });
-
-      window.showToast = function(msg) {
-        const toast = document.getElementById('toast');
-        if (!toast) return;
-        toast.innerText = msg;
-        toast.classList.remove('hidden');
-        toast.classList.add('visible');
-        setTimeout(() => {
-          toast.classList.remove('visible');
-          setTimeout(() => toast.classList.add('hidden'), 300);
-        }, 2500);
-      };
     });
   </script>
 </body>

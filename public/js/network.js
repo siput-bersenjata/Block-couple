@@ -216,6 +216,15 @@ class NetworkManager {
         this.joinRoom(targetRoom, this.username, true, session.levelIndex || 0, savedPos, false);
       }
       return true;
+    } else if (roomParam && roomParam !== 'Publik') {
+      console.log('[Network] Direct room query detected, auto-joining catalog:', roomParam);
+      const savedName = localStorage.getItem('blockCoupleUsername') || ('Pemain ' + Math.floor(10 + Math.random() * 89));
+      this.username = savedName;
+      this.roomCode = roomParam;
+      this.slot = 2;
+      this.inCatalog = true;
+      this.resumeJoinerInCatalog(roomParam, savedName);
+      return true;
     }
     return false;
   }
@@ -246,6 +255,9 @@ class NetworkManager {
     this.inCatalog = true;
     this.roomCode = roomCode;
 
+    // Immediately show the catalog UI synchronously
+    this.openGameCatalog(roomCode, 1, false);
+
     console.log('[Network] Re-hosting catalog room after refresh:', roomCode);
     this.startHostPeer(`bc2d-${roomCode}`, 0, null, true);
   }
@@ -256,6 +268,9 @@ class NetworkManager {
     this.slot = 2;
     this.inCatalog = true;
     this.roomCode = roomCode;
+
+    // Immediately show the catalog UI synchronously
+    this.openGameCatalog(roomCode, 2, false);
 
     console.log('[Network] Re-joining catalog room after refresh:', roomCode);
     this.joinRoom(roomCode, username, true, 0, null, true);
@@ -337,7 +352,16 @@ class NetworkManager {
     this.peer.on('error', (err) => {
       console.warn('Host Peer error:', err);
       if (err.type === 'unavailable-id') {
-        if (!this.isPublic) {
+        if (this.inCatalog && this.roomCode) {
+          // On refresh, the previous PeerJS connection might linger for a few seconds.
+          // Retry connecting with the same room code after a short delay instead of assigning a new random room code!
+          console.log('[Network] Peer ID temporarily busy on refresh, retrying in 1.2s...');
+          setTimeout(() => {
+            if (this.inCatalog && this.roomCode) {
+              this.startHostPeer(`bc2d-${this.roomCode}`, startLevelIdx, restorePos, openCatalogFirst);
+            }
+          }, 1200);
+        } else if (!this.isPublic) {
           // If collision on private code, create a new random one
           this.createPrivateRoom(this.username);
         }
@@ -1216,8 +1240,16 @@ class NetworkManager {
     // Update Scores
     this.updateCatalogScoreDisplay();
 
-    // Render 20 game cards
-    if (window.renderGameCatalog) window.renderGameCatalog();
+    // Render 20 game cards immediately
+    if (typeof window.renderGameCatalog === 'function') {
+      window.renderGameCatalog();
+    } else {
+      setTimeout(() => {
+        if (typeof window.renderGameCatalog === 'function') {
+          window.renderGameCatalog();
+        }
+      }, 50);
+    }
 
     this.saveSession(0);
   }
